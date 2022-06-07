@@ -1,0 +1,7 @@
+nx = 16
+nsteps = 100
+plot_int = 10
+
+tau = 0.9
+
+A = 0.001
