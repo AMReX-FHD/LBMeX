@@ -4,6 +4,7 @@
 #include <AMReX_MFParallelFor.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_PlotFileUtil.H>
+#include "StructFact.H"
 
 using namespace amrex;
 
@@ -50,7 +51,37 @@ void lbm_main() {
 
   MultiFab fold(ba, dm, ncomp, nghost);
   MultiFab fnew(ba, dm, ncomp, nghost);
-  MultiFab hydrovars(ba, dm, 1, nghost);
+  MultiFab hydrovars(ba, dm, 3, nghost);
+
+  ///////////////////////////////////////////
+  // Initialize structure factor object for analysis
+  ///////////////////////////////////////////
+
+  // variables are velocities
+  int structVars = AMREX_SPACEDIM;
+
+  Vector< std::string > var_names;
+  var_names.resize(structVars);
+
+  int cnt = 0;
+  std::string name;
+
+  // velx, vely, velz
+  for (int d=0; d<AMREX_SPACEDIM; d++) {
+    name = "vel";
+    name += (120+d);
+    var_names[cnt++] = name;
+  }
+
+  MultiFab structFactMF(ba, dm, structVars, 0);
+  structFactMF.setVal(0.);
+
+  Vector<Real> var_scaling(structVars*(structVars+1)/2);
+  for (int d=0; d<var_scaling.size(); ++d) {
+    var_scaling[d] = 1.;
+  }
+
+  StructFact structFact(ba,dm,var_names,var_scaling);
 
   // set up references to arrays
   auto const & f = fold.arrays(); // LB populations 
@@ -69,13 +100,18 @@ void lbm_main() {
   if (plot_int > 0) {
     int step = 0;
     ParallelFor(hydrovars, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-      u[nbx](x,y,z) = 0.;
+
+      for (int k=0; k<3; ++k)
+	u[nbx](x,y,z,k) = 0.;
       for (int i=0; i<ncomp; ++i) {
-	u[nbx](x,y,z) += f[nbx](x,y,z,i)*c[i][1];
+	for (int k=0; k<3; ++k)
+	  u[nbx](x,y,z,k) += f[nbx](x,y,z,i)*c[i][k];
       }
     });
     const std::string& pltfile = amrex::Concatenate("plt",step,5);
     WriteSingleLevelPlotfile(pltfile, hydrovars, {"u"}, geom, time, step);
+    structFact.FortStructure(structFactMF,geom);
+    structFact.WritePlotFile(0,0.,geom,"plt_SF");
   }
 
   // TIMESTEP
@@ -94,6 +130,8 @@ void lbm_main() {
 
     MultiFab::Copy(fold, fnew, 0, 0, ncomp, 0);
     
+    structFact.FortStructure(structFactMF,geom);
+
     Print() << "LB step " << step << "\n";
    
     // OUTPUT
@@ -107,6 +145,7 @@ void lbm_main() {
       });
       const std::string& pltfile = Concatenate("plt",step,5);
       WriteSingleLevelPlotfile(pltfile, hydrovars, {"u"}, geom, time, step);
+      structFact.WritePlotFile(step,time,geom,"plt_SF");
     }
 
   }
