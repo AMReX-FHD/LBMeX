@@ -49,6 +49,28 @@ const Real w[19] = {
   1./36.
 };
 
+const Real b[19] = {
+  1.0,
+  1./3.,
+  1./3.,
+  1./3.,
+  2./3.,
+  4./9.,
+  4./3.,
+  1./9.,
+  1./9.,
+  1./9.,
+  2./3.,
+  2./3.,
+  2./3.,
+  2./9.,
+  2./9.,
+  2./9.,
+  2.0,
+  4./9.,
+  4./3.
+};
+
 inline Array<Real,ncomp> moments(const Array<Real,ncomp>& fsite) {
   Array<Real,ncomp> m;
 

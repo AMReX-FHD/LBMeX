@@ -25,6 +25,7 @@ void lbm_main() {
   pp.query("nsteps", nsteps);
   pp.query("plot_int", plot_int);
   pp.query("tau", tau);
+  pp.query("temperature", temperature);
   pp.query("A", A);
 
   // default one ghost/halo layer
@@ -86,8 +87,8 @@ void lbm_main() {
       const Box& valid_box = mfi.validbox();
       const Array4<Real>& fOld = fold.array(mfi);
       const Array4<Real>& fNew = fnew.array(mfi);
-      ParallelFor(valid_box, [=] AMREX_GPU_DEVICE(int x, int y, int z) {
-	stream_collide(x, y, z, fOld, fNew);
+      ParallelForRNG(valid_box, [=] AMREX_GPU_DEVICE(int x, int y, int z, RandomEngine const& engine) {
+        stream_collide(x, y, z, fOld, fNew, engine);
       });
     }
 
