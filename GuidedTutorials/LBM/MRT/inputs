@@ -1,9 +1,9 @@
 nx = 64
-nsteps = 100000
+nsteps = 600000
 plot_int = 1000
 
 density = 1.0
-temperature = 1e-7
+temperature = 0.111111e-6
 tau = 1.0
 
 A = 0.0

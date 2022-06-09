@@ -52,14 +52,14 @@ void main_driver(const char* argv) {
   MultiFab fold(ba, dm, ncomp, nghost);
   MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
-  MultiFab vel(ba, dm, AMREX_SPACEDIM, 0);
+  MultiFab sf(ba, dm, AMREX_SPACEDIM+1, 0);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
   ///////////////////////////////////////////
 
   // variables are velocities
-  int structVars = vel.nComp();
+  int structVars = sf.nComp();
 
   Vector< std::string > var_names;
   var_names.resize(structVars);
@@ -68,6 +68,7 @@ void main_driver(const char* argv) {
   std::string name;
 
   // velx, vely, velz
+  var_names[cnt++] = "rho";
   for (int d=0; d<AMREX_SPACEDIM; d++) {
     name = "vel";
     name += (120+d);
@@ -98,14 +99,14 @@ void main_driver(const char* argv) {
       f[nbx](x,y,z,i) = fequilibrium(density, u)[i];
     }
   });
-  MultiFab::Copy(vel, moments, 1, 0, structVars, 0);
-  structFact.FortStructure(vel, geom);
+  MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
+  structFact.FortStructure(sf, geom);
   
   // Write a plotfile of the initial data if plot_int > 0
   if (plot_int > 0) {
     int step = 0;
     const std::string& pltfile = amrex::Concatenate("plt",step,5);
-    WriteSingleLevelPlotfile(pltfile, vel, var_names, geom, time, step);
+    WriteSingleLevelPlotfile(pltfile, moments, var_names, geom, time, step);
     structFact.WritePlotFile(0, 0., geom, "plt_SF");
   }
 
@@ -123,8 +124,8 @@ void main_driver(const char* argv) {
         stream_collide(x, y, z, mom, fOld, fNew, engine);
       });
     }
-    MultiFab::Copy(vel, moments, 1, 0, structVars, 0);
-    structFact.FortStructure(vel, geom);
+    MultiFab::Copy(sf, moments, 1, 0, structVars, 0);
+    structFact.FortStructure(sf, geom);
 
     std::swap(pfold,pfnew);
     
@@ -134,7 +135,7 @@ void main_driver(const char* argv) {
     time = static_cast<Real>(step);
     if (plot_int > 0 && step%plot_int ==0) {
       const std::string& pltfile = Concatenate("plt",step,5);
-      WriteSingleLevelPlotfile(pltfile, vel, var_names, geom, time, step);
+      WriteSingleLevelPlotfile(pltfile, moments, var_names, geom, time, step);
       structFact.WritePlotFile(step, time, geom, "plt_SF");
     }
 
