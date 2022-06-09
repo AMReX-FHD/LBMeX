@@ -25,8 +25,9 @@ void main_driver(const char* argv) {
   pp.query("nx", nx);
   pp.query("nsteps", nsteps);
   pp.query("plot_int", plot_int);
-  pp.query("tau", tau);
+  pp.query("density", density);
   pp.query("temperature", temperature);
+  pp.query("tau", tau);
   pp.query("A", A);
 
   // default one ghost/halo layer
@@ -49,7 +50,7 @@ void main_driver(const char* argv) {
   DistributionMapping dm(ba);
 
   MultiFab fold(ba, dm, ncomp, nghost);
-  MultiFab fnew(ba, dm, ncomp, 0);
+  MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
   MultiFab vel(ba, dm, AMREX_SPACEDIM, 0);
 
@@ -80,13 +81,16 @@ void main_driver(const char* argv) {
 
   StructFact structFact(ba, dm, var_names, var_scaling);
 
+  MultiFab *pfold = &fold;
+  MultiFab *pfnew = &fnew;
+
   // set up references to arrays
-  auto const & f = fold.arrays(); // LB populations 
+  auto const & f = pfold->arrays(); // LB populations
   auto const & m = moments.arrays(); // hydrodynamic fields
   
   // INITIALIZE: set up sinusoidal shear wave u_y(x)=A*sin(k*x)
   Real time = 0.0;
-  ParallelFor(fold, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
+  ParallelFor(*pfold, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
     const Real uy = A*std::sin(2.*M_PI*x/nx);
     const RealVect u = {0., uy, 0. };
     for (int i=0; i<ncomp; ++i) {
@@ -108,12 +112,12 @@ void main_driver(const char* argv) {
   // TIMESTEP
   for (int step=1; step <= nsteps; ++step) {
 
-    fold.FillBoundary(geom.periodicity());
+    pfold->FillBoundary(geom.periodicity());
 
-    for (MFIter mfi(fold); mfi.isValid(); ++mfi) {
+    for (MFIter mfi(*pfold); mfi.isValid(); ++mfi) {
       const Box& valid_box = mfi.validbox();
-      const Array4<Real>& fOld = fold.array(mfi);
-      const Array4<Real>& fNew = fnew.array(mfi);
+      const Array4<Real>& fOld = pfold->array(mfi);
+      const Array4<Real>& fNew = pfnew->array(mfi);
       const Array4<Real>& mom = moments.array(mfi);
       ParallelForRNG(valid_box, [=] AMREX_GPU_DEVICE(int x, int y, int z, RandomEngine const& engine) {
         stream_collide(x, y, z, mom, fOld, fNew, engine);
@@ -122,7 +126,7 @@ void main_driver(const char* argv) {
     MultiFab::Copy(vel, moments, 1, 0, structVars, 0);
     structFact.FortStructure(vel, geom);
 
-    MultiFab::Copy(fold, fnew, 0, 0, ncomp, 0);
+    std::swap(pfold,pfnew);
     
     Print() << "LB step " << step << "\n";
    
