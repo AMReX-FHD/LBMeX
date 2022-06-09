@@ -35,7 +35,6 @@ void main_driver(const char* argv) {
   // make Box and Geomtry
   IntVect dom_lo(0, 0, 0);
   IntVect dom_hi(nx-1, nx-1, nx-1);
-  IntVect ngs(nghost);
   Array<int,3> periodicity({1,1,1});
 
   Box domain(dom_lo, dom_hi);
@@ -50,15 +49,16 @@ void main_driver(const char* argv) {
   DistributionMapping dm(ba);
 
   MultiFab fold(ba, dm, ncomp, nghost);
-  MultiFab fnew(ba, dm, ncomp, nghost);
-  MultiFab hydrovars(ba, dm, AMREX_SPACEDIM, nghost);
+  MultiFab fnew(ba, dm, ncomp, 0);
+  MultiFab moments(ba, dm, ncomp, 0);
+  MultiFab vel(ba, dm, AMREX_SPACEDIM, 0);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
   ///////////////////////////////////////////
 
   // variables are velocities
-  int structVars = AMREX_SPACEDIM;
+  int structVars = vel.nComp();
 
   Vector< std::string > var_names;
   var_names.resize(structVars);
@@ -82,31 +82,26 @@ void main_driver(const char* argv) {
 
   // set up references to arrays
   auto const & f = fold.arrays(); // LB populations 
-  auto const & u = hydrovars.arrays(); // hydrodynamic fields
+  auto const & m = moments.arrays(); // hydrodynamic fields
   
   // INITIALIZE: set up sinusoidal shear wave u_y(x)=A*sin(k*x)
   Real time = 0.0;
-  ParallelFor(fold, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-    Real uy = A*std::sin(2.*M_PI*x/nx);
+  ParallelFor(fold, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
+    const Real uy = A*std::sin(2.*M_PI*x/nx);
+    const RealVect u = {0., uy, 0. };
     for (int i=0; i<ncomp; ++i) {
-      f[nbx](x,y,z,i)= fequilibrium(1.0, {0., uy, 0.})[i];
+      m[nbx](x,y,z,i) = mequilibrium(density, u)[i];
+      f[nbx](x,y,z,i) = fequilibrium(density, u)[i];
     }
   });
+  MultiFab::Copy(vel, moments, 1, 0, structVars, 0);
+  structFact.FortStructure(vel, geom);
   
   // Write a plotfile of the initial data if plot_int > 0
   if (plot_int > 0) {
     int step = 0;
-    ParallelFor(hydrovars, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-      for (int k=0; k<AMREX_SPACEDIM; ++k) {
-	u[nbx](x,y,z,k) = 0.;
-	for (int i=0; i<ncomp; ++i) {
-	  u[nbx](x,y,z,k) += f[nbx](x,y,z,i)*c[i][k];
-	}
-      }
-    });
     const std::string& pltfile = amrex::Concatenate("plt",step,5);
-    WriteSingleLevelPlotfile(pltfile, hydrovars, var_names, geom, time, step);
-    structFact.FortStructure(hydrovars, geom);
+    WriteSingleLevelPlotfile(pltfile, vel, var_names, geom, time, step);
     structFact.WritePlotFile(0, 0., geom, "plt_SF");
   }
 
@@ -119,30 +114,23 @@ void main_driver(const char* argv) {
       const Box& valid_box = mfi.validbox();
       const Array4<Real>& fOld = fold.array(mfi);
       const Array4<Real>& fNew = fnew.array(mfi);
+      const Array4<Real>& mom = moments.array(mfi);
       ParallelForRNG(valid_box, [=] AMREX_GPU_DEVICE(int x, int y, int z, RandomEngine const& engine) {
-        stream_collide(x, y, z, fOld, fNew, engine);
+        stream_collide(x, y, z, mom, fOld, fNew, engine);
       });
     }
+    MultiFab::Copy(vel, moments, 1, 0, structVars, 0);
+    structFact.FortStructure(vel, geom);
 
     MultiFab::Copy(fold, fnew, 0, 0, ncomp, 0);
     
-    ParallelFor(hydrovars, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-      for (int k=0; k<AMREX_SPACEDIM; ++k) {
-	u[nbx](x,y,z) = 0.0;
-	for (int i=0; i<ncomp; ++i) {
-	  u[nbx](x,y,z) += f[nbx](x,y,z,i)*c[i][1];
-	}
-      }
-    });
-    structFact.FortStructure(hydrovars,geom);
-
     Print() << "LB step " << step << "\n";
    
     // OUTPUT
     time = static_cast<Real>(step);
     if (plot_int > 0 && step%plot_int ==0) {
       const std::string& pltfile = Concatenate("plt",step,5);
-      WriteSingleLevelPlotfile(pltfile, hydrovars, var_names, geom, time, step);
+      WriteSingleLevelPlotfile(pltfile, vel, var_names, geom, time, step);
       structFact.WritePlotFile(step, time, geom, "plt_SF");
     }
 

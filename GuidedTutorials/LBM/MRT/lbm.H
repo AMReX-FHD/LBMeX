@@ -3,8 +3,9 @@
 
 #include "d3q19.H"
 
-Real tau = 0.9;
+Real density = 1.0;
 Real temperature = 0.0;
+Real tau = 0.9;
 
 inline Array<Real,ncomp> fequilibrium(const Real& rho, const RealVect& u) {
   Array<Real,ncomp> fEq;
@@ -52,12 +53,13 @@ inline Array<Real,ncomp>& thermalize_moments(Array<Real,ncomp>& m, RandomEngine 
   return m;
 }
 
-inline void collide(Array<Real,ncomp>& f, RandomEngine const& engine) {
+inline Array<Real,ncomp> collide(Array<Real,ncomp>& f, RandomEngine const& engine) {
   Array<Real,ncomp> m;
   m = moments(f);
   m = relax_moments(m);
   m = thermalize_moments(m, engine);
   f = populations(m);
+  return m;
 }
 
 // push scheme
@@ -76,17 +78,18 @@ inline void collide_stream(int x, int y, int z, const Array4<Real>& fOld, const 
 }
 
 // pull scheme
-inline void stream_collide(int x, int y, int z, const Array4<Real>& fOld, const Array4<Real>& fNew, RandomEngine const& engine) {
-  Array<Real,ncomp> f;
+inline void stream_collide(int x, int y, int z, const Array4<Real>& mom, const Array4<Real>& fOld, const Array4<Real>& fNew, RandomEngine const& engine) {
+  Array<Real,ncomp> f, m;
   for (int i=0; i<ncomp; ++i) { // pull populations from neighbors
     int xm = x - c[i][0];
     int ym = y - c[i][1];
     int zm = z - c[i][2];
     f[i] = fOld(xm,ym,zm,i);
   }
-  collide(f, engine);
+  m = collide(f, engine);
   for (int i=0; i<ncomp; ++i) { // write populations to current site
     fNew(x,y,z,i) = f[i];
+    mom(x,y,z,i) = m[i];
   }
 }
 

@@ -203,29 +203,35 @@ inline Array<Real,ncomp> populations(const Array<Real,ncomp>& msite) {
   return f;
 }
 
-inline Array<Real,ncomp> mequilibrium(const Array<Real,ncomp>& m) {
+inline Array<Real,ncomp> mequilibrium(const Real& rho, const RealVect& u) {
   Array<Real,ncomp> mEq;
 
   /* mass density */
-  mEq[0] = m[0];
+  mEq[0] = rho;
 
   /* momentum density */
-  mEq[1] = m[1];
-  mEq[2] = m[2];
-  mEq[3] = m[3];
+  mEq[1] = rho*u[0];
+  mEq[2] = rho*u[1];
+  mEq[3] = rho*u[2];
 
   /* equilibrium part of the stress modes */
-  mEq[4] = (m[1]*m[1] + m[2]*m[2] + m[3]*m[3])/m[0];
-  mEq[5] = (m[1]*m[1] - m[2]*m[2])/m[0];
-  mEq[6] = (m[1]*m[1] + m[2]*m[2] - 2.*m[3]*m[3])/m[0];
-  mEq[7] = m[1]*m[2]/m[0];
-  mEq[8] = m[1]*m[3]/m[0];
-  mEq[9] = m[2]*m[3]/m[0];
+  mEq[4] = (u[0]*u[0] + u[1]*u[1] + u[2]*u[2])*rho;
+  mEq[5] = (u[0]*u[0] - u[1]*u[1])*rho;
+  mEq[6] = (u[0]*u[0] + u[1]*u[1] - 2.*u[2]*u[2])*rho;
+  mEq[7] = u[0]*u[1]*rho;
+  mEq[8] = u[0]*u[2]*rho;
+  mEq[9] = u[1]*u[2]*rho;
 
   /* ghost modes have no equilibrium part due to orthogonality */
   for (int i=10; i<ncomp; ++i) mEq[i] = 0.0;
 
   return mEq;
+}
+
+inline Array<Real,ncomp> mequilibrium(const Array<Real,ncomp>& m) {
+  const Real rho = m[0];
+  const RealVect j = { m[1], m[2], m[3] };
+  return mequilibrium(rho, j/rho);
 }
 
 #endif
