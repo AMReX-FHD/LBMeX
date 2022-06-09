@@ -51,7 +51,7 @@ void main_driver(const char* argv) {
 
   MultiFab fold(ba, dm, ncomp, nghost);
   MultiFab fnew(ba, dm, ncomp, nghost);
-  MultiFab hydrovars(ba, dm, 3, nghost);
+  MultiFab hydrovars(ba, dm, AMREX_SPACEDIM, nghost);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
@@ -72,9 +72,6 @@ void main_driver(const char* argv) {
     name += (120+d);
     var_names[cnt++] = name;
   }
-
-  MultiFab structFactMF(ba, dm, structVars, 0);
-  structFactMF.setVal(0.);
 
   Vector<Real> var_scaling(structVars*(structVars+1)/2);
   for (int d=0; d<var_scaling.size(); ++d) {
@@ -100,17 +97,16 @@ void main_driver(const char* argv) {
   if (plot_int > 0) {
     int step = 0;
     ParallelFor(hydrovars, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-
-      for (int k=0; k<3; ++k)
+      for (int k=0; k<AMREX_SPACEDIM; ++k) {
 	u[nbx](x,y,z,k) = 0.;
-      for (int i=0; i<ncomp; ++i) {
-	for (int k=0; k<3; ++k)
+	for (int i=0; i<ncomp; ++i) {
 	  u[nbx](x,y,z,k) += f[nbx](x,y,z,i)*c[i][k];
+	}
       }
     });
     const std::string& pltfile = amrex::Concatenate("plt",step,5);
-    WriteSingleLevelPlotfile(pltfile, hydrovars, {"u"}, geom, time, step);
-    structFact.FortStructure(structFactMF,geom);
+    WriteSingleLevelPlotfile(pltfile, hydrovars, var_names, geom, time, step);
+    structFact.FortStructure(hydrovars, geom);
     structFact.WritePlotFile(0, 0., geom, "plt_SF");
   }
 
@@ -130,21 +126,23 @@ void main_driver(const char* argv) {
 
     MultiFab::Copy(fold, fnew, 0, 0, ncomp, 0);
     
-    structFact.FortStructure(structFactMF,geom);
+    ParallelFor(hydrovars, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
+      for (int k=0; k<AMREX_SPACEDIM; ++k) {
+	u[nbx](x,y,z) = 0.0;
+	for (int i=0; i<ncomp; ++i) {
+	  u[nbx](x,y,z) += f[nbx](x,y,z,i)*c[i][1];
+	}
+      }
+    });
+    structFact.FortStructure(hydrovars,geom);
 
     Print() << "LB step " << step << "\n";
    
     // OUTPUT
     time = static_cast<Real>(step);
     if (plot_int > 0 && step%plot_int ==0) {
-      ParallelFor(hydrovars, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-	u[nbx](x,y,z) = 0.0;
-	for (int i=0; i<ncomp; ++i) {
-	  u[nbx](x,y,z) += f[nbx](x,y,z,i)*c[i][1];
-	}
-      });
       const std::string& pltfile = Concatenate("plt",step,5);
-      WriteSingleLevelPlotfile(pltfile, hydrovars, {"u"}, geom, time, step);
+      WriteSingleLevelPlotfile(pltfile, hydrovars, var_names, geom, time, step);
       structFact.WritePlotFile(step, time, geom, "plt_SF");
     }
 
