@@ -1,7 +1,9 @@
-nx = 16
-nsteps = 100
-plot_int = 10
+nx = 64
+nsteps = 100000
+plot_int = 1000
 
-tau = 0.9
+density = 1.0
+temperature = 1e-7
+tau = 1.0
 
-A = 0.001
+A = 0.0
