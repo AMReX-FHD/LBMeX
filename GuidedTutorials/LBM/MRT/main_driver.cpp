@@ -81,7 +81,7 @@ void main_driver(const char* argv) {
     var_scaling[d] = 1.;
   }
 
-  StructFact structFact(ba,dm,var_names,var_scaling);
+  StructFact structFact(ba, dm, var_names, var_scaling);
 
   // set up references to arrays
   auto const & f = fold.arrays(); // LB populations 
@@ -111,7 +111,7 @@ void main_driver(const char* argv) {
     const std::string& pltfile = amrex::Concatenate("plt",step,5);
     WriteSingleLevelPlotfile(pltfile, hydrovars, {"u"}, geom, time, step);
     structFact.FortStructure(structFactMF,geom);
-    structFact.WritePlotFile(0,0.,geom,"plt_SF");
+    structFact.WritePlotFile(0, 0., geom, "plt_SF");
   }
 
   // TIMESTEP
@@ -145,7 +145,7 @@ void main_driver(const char* argv) {
       });
       const std::string& pltfile = Concatenate("plt",step,5);
       WriteSingleLevelPlotfile(pltfile, hydrovars, {"u"}, geom, time, step);
-      structFact.WritePlotFile(step,time,geom,"plt_SF");
+      structFact.WritePlotFile(step, time, geom, "plt_SF");
     }
 
   }
