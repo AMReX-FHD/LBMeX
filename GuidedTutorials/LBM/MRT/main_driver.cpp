@@ -14,6 +14,7 @@ void main_driver(const char* argv) {
 
   // default grid parameters
   int nx = 16;
+  int max_grid_size = 8;
   int nsteps = 100;
   int plot_int = 10;
 
@@ -23,6 +24,7 @@ void main_driver(const char* argv) {
   // input parameters
   ParmParse pp;
   pp.query("nx", nx);
+  pp.query("max_grid_size", max_grid_size);
   pp.query("nsteps", nsteps);
   pp.query("plot_int", plot_int);
   pp.query("density", density);
@@ -44,11 +46,14 @@ void main_driver(const char* argv) {
   
   Geometry geom(domain, real_box, CoordSys::cartesian, periodicity);
 
-  // make MultiFab
   BoxArray ba(domain);
+
+  // split BoxArray "ba" into chunks no larger than "max_grid_size" along a direction
+  ba.maxSize(max_grid_size);
 
   DistributionMapping dm(ba);
 
+  // make MultiFabs
   MultiFab fold(ba, dm, ncomp, nghost);
   MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
