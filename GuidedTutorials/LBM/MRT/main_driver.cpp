@@ -57,7 +57,7 @@ void main_driver(const char* argv) {
   MultiFab fold(ba, dm, ncomp, nghost);
   MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
-  MultiFab sf(ba, dm, AMREX_SPACEDIM+1, 0);
+  MultiFab sf(ba, dm, 1+AMREX_SPACEDIM+AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
@@ -78,6 +78,15 @@ void main_driver(const char* argv) {
     name = "vel";
     name += (120+d);
     var_names[cnt++] = name;
+  }
+
+  for (int i=0; i<AMREX_SPACEDIM; ++i) {
+    for (int j=i; j<AMREX_SPACEDIM; ++j) {
+      name = "p";
+      name += (120+i);
+      name += (120+j);
+      var_names[cnt++] = name;
+    }
   }
 
   Vector<Real> var_scaling(structVars*(structVars+1)/2);
@@ -106,6 +115,9 @@ void main_driver(const char* argv) {
   });
   MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
   sf.plus(-density, 0, 1);
+  for (int i=0; i<AMREX_SPACEDIM; ++i) {
+    MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
+  }
   structFact.FortStructure(sf, geom);
   
   // Write a plotfile of the initial data if plot_int > 0
@@ -132,6 +144,9 @@ void main_driver(const char* argv) {
     }
     MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
     sf.plus(-density, 0, 1);
+    for (int i=0; i<AMREX_SPACEDIM; ++i) {
+      MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
+    }
     structFact.FortStructure(sf, geom);
 
     std::swap(pfold,pfnew);
