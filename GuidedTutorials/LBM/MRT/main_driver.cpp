@@ -105,6 +105,7 @@ void main_driver(const char* argv) {
     }
   });
   MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
+  sf.plus(-density, 0, 1);
   structFact.FortStructure(sf, geom);
   
   // Write a plotfile of the initial data if plot_int > 0
@@ -130,6 +131,7 @@ void main_driver(const char* argv) {
       });
     }
     MultiFab::Copy(sf, moments, 1, 0, structVars, 0);
+    sf.plus(-density, 0, 1);
     structFact.FortStructure(sf, geom);
 
     std::swap(pfold,pfnew);
