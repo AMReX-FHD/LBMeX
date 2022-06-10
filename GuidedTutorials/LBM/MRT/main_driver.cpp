@@ -130,7 +130,7 @@ void main_driver(const char* argv) {
         stream_collide(x, y, z, mom, fOld, fNew, engine);
       });
     }
-    MultiFab::Copy(sf, moments, 1, 0, structVars, 0);
+    MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
     sf.plus(-density, 0, 1);
     structFact.FortStructure(sf, geom);
 
