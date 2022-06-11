@@ -201,6 +201,33 @@ inline void populations(int x, int y, int z, const Array4<Real>& f, const Array4
   return;
 }
 
+inline Array<Real,ncomp> hydrovars(int x, int y, int z, const Array4<Real>& m) {
+  Array<Real,ncomp> h;
+
+  h[0] = m(x,y,z,0); // rho
+  h[1] = m(x,y,z,1); // jx
+  h[2] = m(x,y,z,2); // jy
+  h[3] = m(x,y,z,3); // jz
+  h[4] = (m(x,y,z,0)+m(x,y,z,4)+0.5*m(x,y,z,6)+1.5*m(x,y,z,5))/3.; // pxx
+  h[5] = m(x,y,z,7); // pxy
+  h[6] = m(x,y,z,8); // pxz
+  h[7] = (m(x,y,z,0)+m(x,y,z,4)+0.5*m(x,y,z,6)-1.5*m(x,y,z,5))/3.; // pyy
+  h[8] = m(x,y,z,9); // pyz
+  h[9] = (m(x,y,z,0)+m(x,y,z,4)-m(x,y,z,6))/3.; // pzz
+
+  // deviatoric stress
+  const Real rho = m(x,y,z,0);
+  const RealVect j = { m(x,y,z,1), m(x,y,z,2), m(x,y,z,3) };
+  h[4] -= rho*cs2 + j[0]*j[0]/rho;
+  h[5] -= j[0]*j[1]/rho;
+  h[6] -= j[0]*j[2]/rho;
+  h[7] -= rho*cs2 + j[1]*j[1]/rho;
+  h[8] -= j[1]*j[2]/rho;
+  h[9] -= rho*cs2 + j[2]*j[2]/rho;
+
+  return h;
+}
+
 inline Array<Real,ncomp> mequilibrium(const Real& rho, const RealVect& u) {
   Array<Real,ncomp> mEq;
 

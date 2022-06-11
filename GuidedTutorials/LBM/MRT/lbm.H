@@ -33,22 +33,31 @@ inline void thermalize_moments(int x, int y, int z, const Array4<Real>& m, Rando
   }
 }
 
-inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& m, RandomEngine const& engine) {
+inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& m, const Array4<Real>& hsite, RandomEngine const& engine) {
+  Array<Real,ncomp> h;
   moments(x, y, z, f, m);
+  h = hydrovars(x, y, z, m);
+  for (int i=0; i<10; ++i) {
+    hsite(x,y,z,i) = 0.5*h[i];
+  }
   relax_moments(x, y, z, m);
   thermalize_moments(x, y, z, m, engine);
+  h = hydrovars(x, y, z, m);
+  for (int i=0; i<10; ++i) {
+    hsite(x,y,z,i) += 0.5*h[i];
+  }
   populations(x, y, z, f, m);
 }
 
 // pull scheme
-inline void stream_collide(int x, int y, int z, const Array4<Real>& mom, const Array4<Real>& fOld, const Array4<Real>& fNew, RandomEngine const& engine) {
+inline void stream_collide(int x, int y, int z, const Array4<Real>& mom, const Array4<Real>& fOld, const Array4<Real>& fNew, const Array4<Real>& h, RandomEngine const& engine) {
   for (int i=0; i<ncomp; ++i) { // pull populations from neighbors
     int xm = x - c[i][0];
     int ym = y - c[i][1];
     int zm = z - c[i][2];
     fNew(x,y,z,i) = fOld(xm,ym,zm,i);
   }
-  collide(x, y, z, fNew, mom, engine); // collide populations on current site
+  collide(x, y, z, fNew, mom, h, engine); // collide populations on current site
 }
 
 #endif

@@ -57,8 +57,8 @@ void main_driver(const char* argv) {
   MultiFab fold(ba, dm, ncomp, nghost);
   MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
-  //MultiFab sf(ba, dm, 1+AMREX_SPACEDIM+AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
-  MultiFab sf(ba, dm, ncomp, 0);
+  MultiFab sf(ba, dm, 1+AMREX_SPACEDIM+AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
+  //MultiFab sf(ba, dm, ncomp, 0);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
@@ -81,6 +81,15 @@ void main_driver(const char* argv) {
     var_names[cnt++] = name;
   }
 
+  for (int i=0; i<AMREX_SPACEDIM; ++i) {
+    for (int j=i; j<AMREX_SPACEDIM; ++j) {
+      name = "p";
+      name += (120+i);
+      name += (120+j);
+      var_names[cnt++] = name;
+    }
+  }
+
   for (; cnt<structVars;) {
     name = "m";
     name += std::to_string(cnt);
@@ -98,9 +107,10 @@ void main_driver(const char* argv) {
   MultiFab *pfnew = &fnew;
 
   // set up references to arrays
-  auto const & f = pfold->arrays(); // LB populations
-  auto const & m = moments.arrays(); // hydrodynamic fields
-  
+  auto const & f = pfold->arrays();  // LB populations
+  auto const & m = moments.arrays(); // LB moments
+  auto const & h = sf.arrays();      // hydrodynamic fields
+
   // INITIALIZE: set up sinusoidal shear wave u_y(x)=A*sin(k*x)
   Real time = 0.0;
   ParallelFor(*pfold, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
@@ -110,21 +120,26 @@ void main_driver(const char* argv) {
       m[nbx](x,y,z,i) = mequilibrium(density, u)[i];
       f[nbx](x,y,z,i) = fequilibrium(density, u)[i];
     }
+    for (int i=0; i<10; ++i) {
+      h[nbx](x,y,z,i) = hydrovars(x,y,z,m[nbx])[i];
+    }
   });
-  MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
+  //MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
   sf.plus(-density, 0, 1);
   for (int i=0; i<AMREX_SPACEDIM; ++i) {
     MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
   }
   structFact.FortStructure(sf, geom);
-  
+
   // Write a plotfile of the initial data if plot_int > 0
   if (plot_int > 0) {
     int step = 0;
     const std::string& pltfile = amrex::Concatenate("plt",step,5);
-    WriteSingleLevelPlotfile(pltfile, moments, var_names, geom, time, step);
+    WriteSingleLevelPlotfile(pltfile, sf, var_names, geom, time, step);
     structFact.WritePlotFile(0, 0., geom, "plt_SF");
   }
+
+  Print() << "LB initialized\n";
 
   // TIMESTEP
   for (int step=1; step <= nsteps; ++step) {
@@ -136,11 +151,12 @@ void main_driver(const char* argv) {
       const Array4<Real>& fOld = pfold->array(mfi);
       const Array4<Real>& fNew = pfnew->array(mfi);
       const Array4<Real>& mom = moments.array(mfi);
+      const Array4<Real>& hydrovars = sf.array(mfi);
       ParallelForRNG(valid_box, [=] AMREX_GPU_DEVICE(int x, int y, int z, RandomEngine const& engine) {
-        stream_collide(x, y, z, mom, fOld, fNew, engine);
+        stream_collide(x, y, z, mom, fOld, fNew, hydrovars, engine);
       });
     }
-    MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
+    //MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
     sf.plus(-density, 0, 1);
     for (int i=0; i<AMREX_SPACEDIM; ++i) {
       MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
@@ -150,12 +166,12 @@ void main_driver(const char* argv) {
     std::swap(pfold,pfnew);
     
     Print() << "LB step " << step << "\n";
-   
+
     // OUTPUT
     time = static_cast<Real>(step);
     if (plot_int > 0 && step%plot_int ==0) {
       const std::string& pltfile = Concatenate("plt",step,5);
-      WriteSingleLevelPlotfile(pltfile, moments, var_names, geom, time, step);
+      WriteSingleLevelPlotfile(pltfile, sf, var_names, geom, time, step);
       structFact.WritePlotFile(step, time, geom, "plt_SF");
     }
 
