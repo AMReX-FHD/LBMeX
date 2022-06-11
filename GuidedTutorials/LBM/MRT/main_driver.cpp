@@ -57,7 +57,8 @@ void main_driver(const char* argv) {
   MultiFab fold(ba, dm, ncomp, nghost);
   MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
-  MultiFab sf(ba, dm, 1+AMREX_SPACEDIM+AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
+  //MultiFab sf(ba, dm, 1+AMREX_SPACEDIM+AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
+  MultiFab sf(ba, dm, ncomp, 0);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
@@ -87,6 +88,12 @@ void main_driver(const char* argv) {
       name += (120+j);
       var_names[cnt++] = name;
     }
+  }
+
+  for (; cnt<structVars;) {
+    name = "m";
+    name += std::to_string(cnt);
+    var_names[cnt++] = name;
   }
 
   Vector<Real> var_scaling(structVars*(structVars+1)/2);
