@@ -91,7 +91,7 @@ void main_driver(const char* argv) {
 
   Vector<Real> var_scaling(structVars*(structVars+1)/2);
   for (int d=0; d<var_scaling.size(); ++d) {
-    var_scaling[d] = 1.;
+    var_scaling[d] = temperature;
   }
 
   StructFact structFact(ba, dm, var_names, var_scaling);
