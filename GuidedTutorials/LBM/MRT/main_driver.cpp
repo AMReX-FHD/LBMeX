@@ -76,18 +76,9 @@ void main_driver(const char* argv) {
   // velx, vely, velz
   var_names[cnt++] = "rho";
   for (int d=0; d<AMREX_SPACEDIM; d++) {
-    name = "vel";
+    name = "u";
     name += (120+d);
     var_names[cnt++] = name;
-  }
-
-  for (int i=0; i<AMREX_SPACEDIM; ++i) {
-    for (int j=i; j<AMREX_SPACEDIM; ++j) {
-      name = "p";
-      name += (120+i);
-      name += (120+j);
-      var_names[cnt++] = name;
-    }
   }
 
   for (; cnt<structVars;) {
