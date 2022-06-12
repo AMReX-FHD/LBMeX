@@ -121,7 +121,7 @@ void main_driver(const char* argv) {
       f[nbx](x,y,z,i) = fequilibrium(density, u)[i];
     }
     for (int i=0; i<10; ++i) {
-      h[nbx](x,y,z,i) = hydrovars(x,y,z,m[nbx])[i];
+      h[nbx](x,y,z,i) = hydrovars(mequilibrium(density, u))[i];
     }
   });
   //MultiFab::Copy(sf, moments, 0, 0, structVars, 0);

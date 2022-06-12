@@ -71,11 +71,12 @@ const Real b[19] = {
   4./3.
 };
 
-inline void moments(int x, int y, int z, const Array4<Real>& fsite, const Array4<Real>& m) {
+inline Array<Real,ncomp> moments(int x, int y, int z, const Array4<Real>& fsite, const Array4<Real>& m) {
   Real f;
   Real mc0, mc1, mc2;
   Real mx1, my1, mz1, mx2, my2, mz2, mx3, my3, mz3;
   Real mxy, mxz, myz, mxx1, myy1, mzz1, mxx2, myy2, mzz2;
+  Array<Real,ncomp> mom;
 
   f = fsite(x,y,z, 0); mc0  = f;
   f = fsite(x,y,z, 1); mx1  = f; mxx1  = f;
@@ -100,27 +101,27 @@ inline void moments(int x, int y, int z, const Array4<Real>& fsite, const Array4
   mc1 = mxx1 + myy1 + mzz1;
   mc2 = mxx2 + myy2 + mzz2;
 
-  m(x,y,z, 0) = mc0 + mc1 + mc2;
-  m(x,y,z, 1) = mx1 + mx2 + mx3;
-  m(x,y,z, 2) = my1 + my2 + my3;
-  m(x,y,z, 3) = mz1 + mz2 + mz3;
-  m(x,y,z, 4) = mc2 - mc0;
-  m(x,y,z, 5) = mxx1 - myy1 + mxx2 - myy2;
-  m(x,y,z, 6) = mc1 - 3.*mzz1 - mc2 + 3.*mzz2;
-  m(x,y,z, 7) = mxy;
-  m(x,y,z, 8) = mxz;
-  m(x,y,z, 9) = myz;
-  m(x,y,z,10) = m(x,y,z,1) - 3.*mx1;
-  m(x,y,z,11) = m(x,y,z,2) - 3.*my1;
-  m(x,y,z,12) = m(x,y,z,3) - 3.*mz1;
-  m(x,y,z,13) = mx2 - mx3;
-  m(x,y,z,14) = my3 - my2;
-  m(x,y,z,15) = mz2 - mz3;
-  m(x,y,z,16) = m(x,y,z,0) - 3.*mc1;
-  m(x,y,z,17) = myy1 - mxx1 + mxx2 - myy2;
-  m(x,y,z,18) = 3.*mzz1 - mc1 + 3.*mzz2 - mc2;
+  mom[ 0] = m(x,y,z, 0) = mc0 + mc1 + mc2;
+  mom[ 1] = m(x,y,z, 1) = mx1 + mx2 + mx3;
+  mom[ 2] = m(x,y,z, 2) = my1 + my2 + my3;
+  mom[ 3] = m(x,y,z, 3) = mz1 + mz2 + mz3;
+  mom[ 4] = m(x,y,z, 4) = mc2 - mc0;
+  mom[ 5] = m(x,y,z, 5) = mxx1 - myy1 + mxx2 - myy2;
+  mom[ 6] = m(x,y,z, 6) = mc1 - 3.*mzz1 - mc2 + 3.*mzz2;
+  mom[ 7] = m(x,y,z, 7) = mxy;
+  mom[ 8] = m(x,y,z, 8) = mxz;
+  mom[ 9] = m(x,y,z, 9) = myz;
+  mom[10] = m(x,y,z,10) = m(x,y,z,1) - 3.*mx1;
+  mom[11] = m(x,y,z,11) = m(x,y,z,2) - 3.*my1;
+  mom[12] = m(x,y,z,12) = m(x,y,z,3) - 3.*mz1;
+  mom[13] = m(x,y,z,13) = mx2 - mx3;
+  mom[14] = m(x,y,z,14) = my3 - my2;
+  mom[15] = m(x,y,z,15) = mz2 - mz3;
+  mom[16] = m(x,y,z,16) = m(x,y,z,0) - 3.*mc1;
+  mom[17] = m(x,y,z,17) = myy1 - mxx1 + mxx2 - myy2;
+  mom[18] = m(x,y,z,18) = 3.*mzz1 - mc1 + 3.*mzz2 - mc2;
 
-  return;
+  return mom;
 }
 
 inline void populations(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite) {
@@ -201,29 +202,31 @@ inline void populations(int x, int y, int z, const Array4<Real>& f, const Array4
   return;
 }
 
-inline Array<Real,ncomp> hydrovars(int x, int y, int z, const Array4<Real>& m) {
+inline Array<Real,ncomp> hydrovars(const Array<Real,ncomp>& m) {
   Array<Real,ncomp> h;
 
-  h[0] = m(x,y,z,0); // rho
-  h[1] = m(x,y,z,1); // jx
-  h[2] = m(x,y,z,2); // jy
-  h[3] = m(x,y,z,3); // jz
-  h[4] = (m(x,y,z,0)+m(x,y,z,4)+0.5*m(x,y,z,6)+1.5*m(x,y,z,5))/3.; // pxx
-  h[5] = m(x,y,z,7); // pxy
-  h[6] = m(x,y,z,8); // pxz
-  h[7] = (m(x,y,z,0)+m(x,y,z,4)+0.5*m(x,y,z,6)-1.5*m(x,y,z,5))/3.; // pyy
-  h[8] = m(x,y,z,9); // pyz
-  h[9] = (m(x,y,z,0)+m(x,y,z,4)-m(x,y,z,6))/3.; // pzz
+  h[0] = m[0]; // rho
+  h[1] = m[1]; // jx
+  h[2] = m[2]; // jy
+  h[3] = m[3]; // jz
+  h[4] = (m[0]+m[4]+0.5*m[6]+1.5*m[5])/3.; // pxx
+  h[5] = m[7]; // pxy
+  h[6] = m[8]; // pxz
+  h[7] = (m[0]+m[4]+0.5*m[6]-1.5*m[5])/3.; // pyy
+  h[8] = m[9]; // pyz
+  h[9] = (m[0]+m[4]-m[6])/3.; // pzz
 
   // deviatoric stress
-  const Real rho = m(x,y,z,0);
-  const RealVect j = { m(x,y,z,1), m(x,y,z,2), m(x,y,z,3) };
-  h[4] -= rho*cs2 + j[0]*j[0]/rho;
-  h[5] -= j[0]*j[1]/rho;
-  h[6] -= j[0]*j[2]/rho;
-  h[7] -= rho*cs2 + j[1]*j[1]/rho;
-  h[8] -= j[1]*j[2]/rho;
-  h[9] -= rho*cs2 + j[2]*j[2]/rho;
+  if (m[0] > std::numeric_limits<Real>::epsilon()) {
+    const Real rho = m[0];
+    const RealVect j = { m[1], m[2], m[3] };
+    h[4] -= rho*cs2 + j[0]*j[0]/rho;
+    h[5] -= j[0]*j[1]/rho;
+    h[6] -= j[0]*j[2]/rho;
+    h[7] -= rho*cs2 + j[1]*j[1]/rho;
+    h[8] -= j[1]*j[2]/rho;
+    h[9] -= rho*cs2 + j[2]*j[2]/rho;
+  }
 
   return h;
 }

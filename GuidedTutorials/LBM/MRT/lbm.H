@@ -16,48 +16,54 @@ inline Array<Real,ncomp> fequilibrium(const Real& rho, const RealVect& u) {
   return fEq;
 }
 
-inline void relax_moments(int x, int y, int z, const Array4<Real>& m) {
+inline Array<Real,ncomp> relax_moments(int x, int y, int z, const Array4<Real>& m) {
   const Real gamma = 1. - 1./tau;
   const Array<Real,ncomp> mEq = mequilibrium(x, y, z, m);
+  Array<Real,ncomp> mom;
   for (int i=0; i<ncomp; ++i) {
-    m(x,y,z,i) = mEq[i] + gamma * (m(x,y,z,i) - mEq[i]);
+    mom[i] = m(x,y,z,i) = mEq[i] + gamma * (m(x,y,z,i) - mEq[i]);
   }
+  return mom;
 }
 
-inline void thermalize_moments(int x, int y, int z, const Array4<Real>& m, RandomEngine const& engine) {
+inline Array<Real,ncomp> thermalize_moments(int x, int y, int z, const Array4<Real>& m, RandomEngine const& engine) {
   const Real gamma = 1. - 1./tau;
   const Real rho = m(x,y,z,0);
   const Real phi = sqrt(rho*temperature/cs2*(1.-gamma*gamma));
+  Array<Real,ncomp> r = {}; // {} to value initialize r
   for (int i=4; i<ncomp; ++i) {
-    m(x,y,z,i) += sqrt(b[i])*phi*RandomNormal(0., 1., engine);
+    r[i] = sqrt(b[i])*phi*RandomNormal(0., 1., engine);
+    m(x,y,z,i) += r[i];
   }
+  return r;
 }
 
-inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& m, const Array4<Real>& hsite, RandomEngine const& engine) {
-  Array<Real,ncomp> h;
-  moments(x, y, z, f, m);
-  h = hydrovars(x, y, z, m);
+inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite, const Array4<Real>& hsite, RandomEngine const& engine) {
+  Array<Real,ncomp> m, h, r{};
+  m = moments(x, y, z, f, msite);
+  h = hydrovars(m);
   for (int i=0; i<10; ++i) {
     hsite(x,y,z,i) = 0.5*h[i];
   }
-  relax_moments(x, y, z, m);
-  thermalize_moments(x, y, z, m, engine);
-  h = hydrovars(x, y, z, m);
+  m = relax_moments(x, y, z, msite);
+  r = thermalize_moments(x, y, z, msite, engine);
+  h = hydrovars(m);
+  r = hydrovars(r);
   for (int i=0; i<10; ++i) {
-    hsite(x,y,z,i) += 0.5*h[i];
+    hsite(x,y,z,i) += 0.5*h[i] + 0.5*sqrt(3)*r[i];
   }
-  populations(x, y, z, f, m);
+  populations(x, y, z, f, msite);
 }
 
 // pull scheme
-inline void stream_collide(int x, int y, int z, const Array4<Real>& mom, const Array4<Real>& fOld, const Array4<Real>& fNew, const Array4<Real>& h, RandomEngine const& engine) {
+inline void stream_collide(int x, int y, int z, const Array4<Real>& m, const Array4<Real>& fOld, const Array4<Real>& fNew, const Array4<Real>& h, RandomEngine const& engine) {
   for (int i=0; i<ncomp; ++i) { // pull populations from neighbors
     int xm = x - c[i][0];
     int ym = y - c[i][1];
     int zm = z - c[i][2];
     fNew(x,y,z,i) = fOld(xm,ym,zm,i);
   }
-  collide(x, y, z, fNew, mom, h, engine); // collide populations on current site
+  collide(x, y, z, fNew, m, h, engine); // collide populations on current site
 }
 
 #endif
