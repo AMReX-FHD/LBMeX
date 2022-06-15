@@ -10,12 +10,40 @@ using namespace amrex;
 
 #include "lbm.H"
 
+void TimeCorrelation(const MultiFab& mfData, MultiFab& mfCorr, const int ncorr, const int steps) {
+  auto const & data = mfData.arrays();
+  auto const & corr = mfCorr.arrays();
+
+  ParallelFor(mfData, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
+    for (int i=0; i<ncorr; ++i) {
+      corr[nbx](x,y,z,i) = (data[nbx](x,y,z,0)*data[nbx](x,y,z,0)
+			    + corr[nbx](x,y,z,i)*(steps-1))/steps;
+    }
+  });
+
+}
+
+// Update data points for time correlation (assumes equally spaced)
+void UpdateTimeData(MultiFab& mfData, const MultiFab& mfVal, const int comp, const int ncorr) {
+  auto const & data = mfData.arrays();
+  auto const & val = mfVal.arrays();
+
+  ParallelFor(mfData, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
+    for (int i=1; i<ncorr; ++i) {
+      data[nbx](x,y,z,i-1) = data[nbx](x,y,z,i);
+    }
+    data[nbx](x,y,z,ncorr-1) = val[nbx](x,y,z,comp);
+  });
+
+}
+
 void main_driver(const char* argv) {
 
   // default grid parameters
   int nx = 16;
   int max_grid_size = 8;
   int nsteps = 100;
+  int ntimecorr = nsteps;
   int plot_int = 10;
 
   // default amplitude of sinusoidal shear wave
@@ -58,7 +86,8 @@ void main_driver(const char* argv) {
   MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
   MultiFab sf(ba, dm, 1+AMREX_SPACEDIM+AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
-  //MultiFab sf(ba, dm, ncomp, 0);
+  MultiFab mfData(ba, dm, ntimecorr, 0);
+  MultiFab mfCorr(ba, dm, ntimecorr, 0);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
@@ -98,7 +127,7 @@ void main_driver(const char* argv) {
 
   Vector<Real> var_scaling(structVars*(structVars+1)/2);
   for (int d=0; d<var_scaling.size(); ++d) {
-    var_scaling[d] = temperature;
+    if (temperature>0) var_scaling[d] = temperature; else var_scaling[d] = 1.;
   }
 
   StructFact structFact(ba, dm, var_names, var_scaling);
@@ -124,12 +153,14 @@ void main_driver(const char* argv) {
       h[nbx](x,y,z,i) = hydrovars(mequilibrium(density, u))[i];
     }
   });
-  //MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
   sf.plus(-density, 0, 1);
   for (int i=0; i<AMREX_SPACEDIM; ++i) {
     MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
   }
+  sf.mult(sqrt(2.*tau), AMREX_SPACEDIM+1, AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
   structFact.FortStructure(sf, geom);
+  mfData.setVal(0.);
+  mfCorr.setVal(0.);
 
   // Write a plotfile of the initial data if plot_int > 0
   if (plot_int > 0) {
@@ -156,12 +187,14 @@ void main_driver(const char* argv) {
         stream_collide(x, y, z, mom, fOld, fNew, hydrovars, engine);
       });
     }
-    //MultiFab::Copy(sf, moments, 0, 0, structVars, 0);
     sf.plus(-density, 0, 1);
     for (int i=0; i<AMREX_SPACEDIM; ++i) {
       MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
     }
+    sf.mult(sqrt(2.*tau), AMREX_SPACEDIM+1, AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
     structFact.FortStructure(sf, geom);
+    UpdateTimeData(mfData, sf, sf.nComp()-1, ntimecorr);
+    TimeCorrelation(mfData, mfCorr, ntimecorr, nsteps);
 
     std::swap(pfold,pfnew);
     
@@ -173,6 +206,8 @@ void main_driver(const char* argv) {
       const std::string& pltfile = Concatenate("plt",step,5);
       WriteSingleLevelPlotfile(pltfile, sf, var_names, geom, time, step);
       structFact.WritePlotFile(step, time, geom, "plt_SF");
+      const std::string& tcfile = Concatenate("plt_TC",step,5);
+      WriteSingleLevelPlotfile(tcfile, mfCorr, {"timecorr"}, geom, time, step);
     }
 
   }

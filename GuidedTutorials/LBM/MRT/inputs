@@ -1,11 +1,11 @@
 nx = 64
 max_grid_size = 16
 
-nsteps = 600000
+nsteps = 1000
 plot_int = 1000
 
 density = 1.0
 temperature = 0.111111e-6
-tau = 1.0
+tau = 0.75
 
 A = 0.0

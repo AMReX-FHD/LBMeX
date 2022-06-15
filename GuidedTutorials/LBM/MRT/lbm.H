@@ -39,18 +39,18 @@ inline Array<Real,ncomp> thermalize_moments(int x, int y, int z, const Array4<Re
 }
 
 inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite, const Array4<Real>& hsite, RandomEngine const& engine) {
-  Array<Real,ncomp> m, h, r{};
-  m = moments(x, y, z, f, msite);
-  h = hydrovars(m);
-  for (int i=0; i<10; ++i) {
-    hsite(x,y,z,i) = 0.5*h[i];
-  }
+  const Real gamma = 1. - 1./tau;
+  Array<Real,ncomp> m, h, r;
+  moments(x, y, z, f, msite);
   m = relax_moments(x, y, z, msite);
   r = thermalize_moments(x, y, z, msite, engine);
   h = hydrovars(m);
   r = hydrovars(r);
-  for (int i=0; i<10; ++i) {
-    hsite(x,y,z,i) += 0.5*h[i] + 0.5*sqrt(3)*r[i];
+  for (int i=0; i<=AMREX_SPACEDIM; ++i) hsite(x,y,z,i) = h[i];
+  for (int i=AMREX_SPACEDIM+1; i<(AMREX_SPACEDIM+1)*(AMREX_SPACEDIM+2)/2; ++i) {
+    // note that r was not added to m and h
+    // => + 0.5*r[i] instead of - 0.5/gamma*r[i]
+    hsite(x,y,z,i) = 0.5*(1.+1./gamma)*h[i] + 0.5*r[i];
   }
   populations(x, y, z, f, msite);
 }
