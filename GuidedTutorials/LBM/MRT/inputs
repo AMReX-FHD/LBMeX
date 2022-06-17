@@ -3,6 +3,7 @@ max_grid_size = 16
 
 nsteps = 1000
 plot_int = 1000
+ncorr = 100
 
 density = 1.0
 temperature = 0.111111e-6

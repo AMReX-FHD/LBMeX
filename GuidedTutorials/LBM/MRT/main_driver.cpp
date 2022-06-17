@@ -15,9 +15,9 @@ void TimeCorrelation(const MultiFab& mfData, MultiFab& mfCorr, const int ncorr, 
   auto const & corr = mfCorr.arrays();
 
   ParallelFor(mfData, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-    for (int i=0; i<ncorr; ++i) {
-      corr[nbx](x,y,z,i) = (data[nbx](x,y,z,0)*data[nbx](x,y,z,0)
-			    + corr[nbx](x,y,z,i)*(steps-1))/steps;
+    for (int t=0; t<ncorr; ++t) {
+      corr[nbx](x,y,z,t) = (data[nbx](x,y,z,ncorr-1)*data[nbx](x,y,z,ncorr-1-t)
+			    + corr[nbx](x,y,z,t)*(steps-1))/steps;
     }
   });
 
@@ -29,8 +29,8 @@ void UpdateTimeData(MultiFab& mfData, const MultiFab& mfVal, const int comp, con
   auto const & val = mfVal.arrays();
 
   ParallelFor(mfData, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-    for (int i=1; i<ncorr; ++i) {
-      data[nbx](x,y,z,i-1) = data[nbx](x,y,z,i);
+    for (int t=0; t<ncorr-1; ++t) {
+      data[nbx](x,y,z,t) = data[nbx](x,y,z,t+1);
     }
     data[nbx](x,y,z,ncorr-1) = val[nbx](x,y,z,comp);
   });
@@ -43,8 +43,9 @@ void main_driver(const char* argv) {
   int nx = 16;
   int max_grid_size = 8;
   int nsteps = 100;
-  int ntimecorr = nsteps;
   int plot_int = 10;
+  int ncorr = 100;
+  int comp = 5;
 
   // default amplitude of sinusoidal shear wave
   Real A = 0.001;
@@ -59,6 +60,8 @@ void main_driver(const char* argv) {
   pp.query("temperature", temperature);
   pp.query("tau", tau);
   pp.query("A", A);
+  pp.query("ncorr", ncorr);
+  pp.query("comp", comp);
 
   // default one ghost/halo layer
   int nghost = 1;
@@ -86,8 +89,11 @@ void main_driver(const char* argv) {
   MultiFab fnew(ba, dm, ncomp, nghost);
   MultiFab moments(ba, dm, ncomp, 0);
   MultiFab sf(ba, dm, 1+AMREX_SPACEDIM+AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
-  MultiFab mfData(ba, dm, ntimecorr, 0);
-  MultiFab mfCorr(ba, dm, ntimecorr, 0);
+  MultiFab mfData(ba, dm, ncorr, 0);
+  MultiFab mfCorr(ba, dm, ncorr, 0);
+
+  mfData.setVal(0.);
+  mfCorr.setVal(0.);
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
@@ -159,14 +165,21 @@ void main_driver(const char* argv) {
   }
   sf.mult(sqrt(2.*tau), AMREX_SPACEDIM+1, AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
   structFact.FortStructure(sf, geom);
-  mfData.setVal(0.);
-  mfCorr.setVal(0.);
+  //UpdateTimeData(mfData, sf, comp, ncorr);
+  //TimeCorrelation(mfData, mfCorr, ncorr, 1);
+
+  Vector<std::string> tnames(ncorr);
+  for (int t=0; t<ncorr; ++t) {
+    tnames[t] = Concatenate("plt_TC",t,4);
+  }
 
   // Write a plotfile of the initial data if plot_int > 0
   if (plot_int > 0) {
     int step = 0;
     const std::string& pltfile = amrex::Concatenate("plt",step,5);
     WriteSingleLevelPlotfile(pltfile, sf, var_names, geom, time, step);
+    const std::string& tcfile = Concatenate("plt_TC",step,5);
+    WriteSingleLevelPlotfile(tcfile, mfCorr, tnames, geom, time, step);
     structFact.WritePlotFile(0, 0., geom, "plt_SF");
   }
 
@@ -191,13 +204,13 @@ void main_driver(const char* argv) {
     for (int i=0; i<AMREX_SPACEDIM; ++i) {
       MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
     }
+    std::swap(pfold,pfnew);
+
     sf.mult(sqrt(2.*tau), AMREX_SPACEDIM+1, AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
     structFact.FortStructure(sf, geom);
-    UpdateTimeData(mfData, sf, sf.nComp()-1, ntimecorr);
-    TimeCorrelation(mfData, mfCorr, ntimecorr, nsteps);
+    UpdateTimeData(mfData, sf, comp, ncorr);
+    if (step > ncorr) TimeCorrelation(mfData, mfCorr, ncorr, step+1);
 
-    std::swap(pfold,pfnew);
-    
     Print() << "LB step " << step << "\n";
 
     // OUTPUT
@@ -205,9 +218,9 @@ void main_driver(const char* argv) {
     if (plot_int > 0 && step%plot_int ==0) {
       const std::string& pltfile = Concatenate("plt",step,5);
       WriteSingleLevelPlotfile(pltfile, sf, var_names, geom, time, step);
-      structFact.WritePlotFile(step, time, geom, "plt_SF");
       const std::string& tcfile = Concatenate("plt_TC",step,5);
-      WriteSingleLevelPlotfile(tcfile, mfCorr, {"timecorr"}, geom, time, step);
+      WriteSingleLevelPlotfile(tcfile, mfCorr, tnames, geom, time, step);
+      structFact.WritePlotFile(step, time, geom, "plt_SF");
     }
 
   }
