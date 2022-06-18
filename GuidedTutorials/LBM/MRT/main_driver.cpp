@@ -45,7 +45,7 @@ void main_driver(const char* argv) {
   int nsteps = 100;
   int plot_int = 10;
   int ncorr = 100;
-  int comp = 5;
+  int comp = 9;
 
   // default amplitude of sinusoidal shear wave
   Real A = 0.001;
@@ -94,6 +94,11 @@ void main_driver(const char* argv) {
 
   mfData.setVal(0.);
   mfCorr.setVal(0.);
+
+  Vector<std::string> tnames(ncorr);
+  for (int t=0; t<ncorr; ++t) {
+    tnames[t] = Concatenate("plt_TC",t,4);
+  }
 
   ///////////////////////////////////////////
   // Initialize structure factor object for analysis
@@ -159,17 +164,13 @@ void main_driver(const char* argv) {
       h[nbx](x,y,z,i) = hydrovars(mequilibrium(density, u))[i];
     }
   });
+
   sf.plus(-density, 0, 1);
   for (int i=0; i<AMREX_SPACEDIM; ++i) {
     MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
   }
   structFact.FortStructure(sf, geom);
-  UpdateTimeData(mfData, sf, comp, ncorr);
-
-  Vector<std::string> tnames(ncorr);
-  for (int t=0; t<ncorr; ++t) {
-    tnames[t] = Concatenate("plt_TC",t,4);
-  }
+  UpdateTimeData(mfData, moments, comp, ncorr);
 
   // Write a plotfile of the initial data if plot_int > 0
   if (plot_int > 0) {
@@ -198,14 +199,14 @@ void main_driver(const char* argv) {
         stream_collide(x, y, z, mom, fOld, fNew, hydrovars, engine);
       });
     }
+    std::swap(pfold,pfnew);
+
     sf.plus(-density, 0, 1);
     for (int i=0; i<AMREX_SPACEDIM; ++i) {
       MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
     }
-    std::swap(pfold,pfnew);
-
     structFact.FortStructure(sf, geom);
-    UpdateTimeData(mfData, sf, comp, ncorr);
+    UpdateTimeData(mfData, moments, comp, ncorr);
     if (step >= ncorr) TimeCorrelation(mfData, mfCorr, ncorr, step+1);
 
     Print() << "LB step " << step << "\n";
