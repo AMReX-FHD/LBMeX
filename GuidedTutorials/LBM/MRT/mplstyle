@@ -1,0 +1,6 @@
+lines.linewidth : 2
+axes.titlesize : 18
+axes.labelsize : 18
+xtick.labelsize : 16
+ytick.labelsize : 16
+legend.fontsize: 16
