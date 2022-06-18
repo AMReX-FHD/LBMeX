@@ -38,31 +38,35 @@ inline Array<Real,ncomp> thermalize_moments(int x, int y, int z, const Array4<Re
   return r;
 }
 
-inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite, const Array4<Real>& hsite, RandomEngine const& engine) {
+inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite, const Array4<Real>& hsite, const Array4<Real>& hEqsite, RandomEngine const& engine) {
   const Real gamma = 1. - 1./tau;
-  Array<Real,ncomp> m, h, r;
+  Array<Real,ncomp> m, h, hEq, r;
+  // collision step
   m = moments(x, y, z, f, msite);
-  h = hydrovars(m);
   relax_moments(x, y, z, msite);
   r = thermalize_moments(x, y, z, msite, engine);
+  // record hydrodynamic variables
+  h = hydrovars(m);
   r = hydrovars(r);
+  hEq = hydrovars(mequilibrium(h[0], { h[1], h[2], h[3] }));
   for (int i=0; i<=AMREX_SPACEDIM; ++i) hsite(x,y,z,i) = h[i];
   for (int i=AMREX_SPACEDIM+1; i<(AMREX_SPACEDIM+1)*(AMREX_SPACEDIM+2)/2; ++i) {
     // note that h is pre-collision
-    hsite(x,y,z,i) = 0.5*(1.+gamma)*h[i] + 0.5*r[i];
+    hEqsite(x,y,z,i) = hEq[i];
+    hsite(x,y,z,i) = hEq[i] + 0.5*(1.+gamma)*(h[i]-hEq[i]) + 0.5*r[i];
   }
   populations(x, y, z, f, msite);
 }
 
 // pull scheme
-inline void stream_collide(int x, int y, int z, const Array4<Real>& m, const Array4<Real>& fOld, const Array4<Real>& fNew, const Array4<Real>& h, RandomEngine const& engine) {
+inline void stream_collide(int x, int y, int z, const Array4<Real>& fOld, const Array4<Real>& fNew,  const Array4<Real>& m, const Array4<Real>& h, const Array4<Real>& hEq, RandomEngine const& engine) {
   for (int i=0; i<ncomp; ++i) { // pull populations from neighbors
     int xm = x - c[i][0];
     int ym = y - c[i][1];
     int zm = z - c[i][2];
     fNew(x,y,z,i) = fOld(xm,ym,zm,i);
   }
-  collide(x, y, z, fNew, m, h, engine); // collide populations on current site
+  collide(x, y, z, fNew, m, h, hEq, engine); // collide populations on current site
 }
 
 #endif

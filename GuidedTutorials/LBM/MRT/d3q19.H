@@ -206,27 +206,15 @@ inline Array<Real,ncomp> hydrovars(const Array<Real,ncomp>& m) {
   Array<Real,ncomp> h;
 
   h[0] = m[0]; // rho
-  h[1] = m[1]; // jx
-  h[2] = m[2]; // jy
-  h[3] = m[3]; // jz
+  h[1] = m[1]/m[0]; // ux
+  h[2] = m[2]/m[0]; // uy
+  h[3] = m[3]/m[0]; // uz
   h[4] = (m[0]+m[4]+0.5*m[6]+1.5*m[5])/3.; // pxx
   h[5] = m[7]; // pxy
   h[6] = m[8]; // pxz
   h[7] = (m[0]+m[4]+0.5*m[6]-1.5*m[5])/3.; // pyy
   h[8] = m[9]; // pyz
   h[9] = (m[0]+m[4]-m[6])/3.; // pzz
-
-  // deviatoric stress
-  if (m[0] > std::numeric_limits<Real>::epsilon()) {
-    const Real rho = m[0];
-    const RealVect j = { m[1], m[2], m[3] };
-    h[4] -= rho*cs2 + j[0]*j[0]/rho;
-    h[5] -= j[0]*j[1]/rho;
-    h[6] -= j[0]*j[2]/rho;
-    h[7] -= rho*cs2 + j[1]*j[1]/rho;
-    h[8] -= j[1]*j[2]/rho;
-    h[9] -= rho*cs2 + j[2]*j[2]/rho;
-  }
 
   return h;
 }
