@@ -227,4 +227,13 @@ void main_driver(const char* argv) {
 
   }
 
+  // FINAL OUTPUT
+  Real eta = 0.0;
+  for (int i=0; i<ncorr; ++i) {
+    eta += mfCorr.sum(i)/(nx*nx*nx);
+  }
+  eta /= temperature;
+
+  Print() << "Green-Kubo viscosity for tau = " << tau << " eta = " << eta << std::endl;
+
 }
