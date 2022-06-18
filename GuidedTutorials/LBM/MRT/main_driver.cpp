@@ -163,10 +163,8 @@ void main_driver(const char* argv) {
   for (int i=0; i<AMREX_SPACEDIM; ++i) {
     MultiFab::Divide(sf, moments, 0, 1+i, 1, 0);
   }
-  sf.mult(sqrt(2.*tau), AMREX_SPACEDIM+1, AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
   structFact.FortStructure(sf, geom);
-  //UpdateTimeData(mfData, sf, comp, ncorr);
-  //TimeCorrelation(mfData, mfCorr, ncorr, 1);
+  UpdateTimeData(mfData, sf, comp, ncorr);
 
   Vector<std::string> tnames(ncorr);
   for (int t=0; t<ncorr; ++t) {
@@ -206,10 +204,9 @@ void main_driver(const char* argv) {
     }
     std::swap(pfold,pfnew);
 
-    sf.mult(sqrt(2.*tau), AMREX_SPACEDIM+1, AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2, 0);
     structFact.FortStructure(sf, geom);
     UpdateTimeData(mfData, sf, comp, ncorr);
-    if (step > ncorr) TimeCorrelation(mfData, mfCorr, ncorr, step+1);
+    if (step >= ncorr) TimeCorrelation(mfData, mfCorr, ncorr, step+1);
 
     Print() << "LB step " << step << "\n";
 
