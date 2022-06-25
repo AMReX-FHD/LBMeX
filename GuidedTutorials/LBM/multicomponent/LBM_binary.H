@@ -1,7 +1,7 @@
 #ifndef LBM_H_
 #define LBM_H_
 
-#include "d3q19.H"
+#include "LBM_d3q19.H"
 
 Real density = 1.0;
 Real temperature = 0.0;
@@ -26,43 +26,25 @@ inline Array<Real,ncomp> relax_moments(int x, int y, int z, const Array4<Real>& 
   return mom;
 }
 
-inline Array<Real,ncomp> thermalize_moments(int x, int y, int z, const Array4<Real>& m, RandomEngine const& engine) {
-  const Real gamma = 1. - 1./tau;
-  const Real rho = m(x,y,z,0);
-  const Real phi = sqrt(rho*temperature/cs2*(1.-gamma*gamma));
-  Array<Real,ncomp> r = {}; // {} to value initialize r
-  for (int i=4; i<ncomp; ++i) {
-    r[i] = sqrt(b[i])*phi*RandomNormal(0., 1., engine);
-    m(x,y,z,i) += r[i];
-  }
-  return r;
-}
-
 inline void collide(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite, const Array4<Real>& hsite, RandomEngine const& engine) {
-  const Real gamma = 1. - 1./tau;
-  Array<Real,ncomp> m, h, r;
   moments(x, y, z, f, msite);
-  m = relax_moments(x, y, z, msite);
-  r = thermalize_moments(x, y, z, msite, engine);
-  h = hydrovars(m);
-  r = hydrovars(r);
-  for (int i=0; i<=AMREX_SPACEDIM; ++i) hsite(x,y,z,i) = h[i];
-  for (int i=AMREX_SPACEDIM+1; i<(AMREX_SPACEDIM+1)*(AMREX_SPACEDIM+2)/2; ++i) {
-    // note that r was not added to m and h
-    // => + 0.5*r[i] instead of - 0.5/gamma*r[i]
-    hsite(x,y,z,i) = 0.5*(1.+1./gamma)*h[i] + 0.5*r[i];
-  }
+  relax_moments(x, y, z, msite);
   populations(x, y, z, f, msite);
 }
 
-// pull scheme
-inline void stream_collide(int x, int y, int z, const Array4<Real>& m, const Array4<Real>& fOld, const Array4<Real>& fNew, const Array4<Real>& h, RandomEngine const& engine) {
+// stream from \vec{x}-\vec{c}_i to \vec{x} (pull scheme)
+inline void stream_pull(int x, int y, int z, const Array4<Real>& fOld, const Array4<Real>& fNew) {
   for (int i=0; i<ncomp; ++i) { // pull populations from neighbors
     int xm = x - c[i][0];
     int ym = y - c[i][1];
     int zm = z - c[i][2];
     fNew(x,y,z,i) = fOld(xm,ym,zm,i);
   }
+}
+
+// pull scheme
+inline void stream_collide(int x, int y, int z, const Array4<Real>& m, const Array4<Real>& fOld, const Array4<Real>& fNew, const Array4<Real>& h, RandomEngine const& engine) {
+  stream_pull(x, y, z, fOld, fNew);     // pull populations from neighbors
   collide(x, y, z, fNew, m, h, engine); // collide populations on current site
 }
 
