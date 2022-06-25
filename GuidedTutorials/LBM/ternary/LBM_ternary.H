@@ -374,9 +374,9 @@ inline void LBM_timestep(const Geometry& geom,
 		   fOld[nbx], gOld[nbx], kOld[nbx],
 		   fNew[nbx], gNew[nbx], kNew[nbx], h[nbx]);
   });
-  std::swap(fold,fnew);
-  std::swap(gold,gnew);
-  std::swap(kold,knew);
+  MultiFab::Swap(fold, fnew, 0, 0, nvel, 0);
+  MultiFab::Swap(gold, gnew, 0, 0, nvel, 0);
+  MultiFab::Swap(kold, knew, 0, 0, nvel, 0);
   LBM_hydrovars(fold, gold, kold, hydrovs);
 }
 
