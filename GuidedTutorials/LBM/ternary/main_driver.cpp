@@ -62,6 +62,9 @@ void main_driver(const char* argv) {
   int nsteps = 100;
   int plot_int = 10;
 
+  // default droplet radius (% of box size)
+  Real radius = 0.3;
+
   // input parameters
   ParmParse pp;
   pp.query("nx", nx);

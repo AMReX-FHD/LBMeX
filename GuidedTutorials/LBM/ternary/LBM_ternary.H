@@ -409,32 +409,36 @@ inline void LBM_init_mixture(MultiFab& mf,
 }
 
 // double emulsion droplet of C1 and C2 surrounded by C3
-inline void LBM_init_double_emulsion(const Real radius,
+inline void LBM_init_double_emulsion(const Real r,
 				     const Geometry geom,
 				     MultiFab& mf,
 				     MultiFab& mg,
 				     MultiFab& mk,
 				     MultiFab& hydrovs) {
+  const IntVect box = geom.Domain().length();
+  const Real R = r*box[0];
+
   auto const & f = mf.arrays();
   auto const & g = mg.arrays();
   auto const & k = mk.arrays();
   GpuArray<Real,3> dx = geom.CellSizeArray();
   ParallelFor(mf, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-    Real rx = (x+0.5)*dx[0];
-    Real ry = (y+0.5)*dx[1];
+    Real rx = x-box[0]/2;
+    Real ry = y-box[1]/2;
 #if (AMREX_SPACEDIM == 2)
-    Real r2 = ((rx-0.5)*(rx-0.5)+(ry-0.5)*(ry-0.5));
+    Real r2 = rx*rx+ry*ry;
 #elif (AMREX_SPACEDIM == 3)
-    Real rz = (z+0.5)*dx[2];
-    Real r2 = ((rx-0.5)*(rx-0.5)+(ry-0.5)*(ry-0.5)+(rz-0.5)*(rz-0.5));
+    Real rz = z-box[0]/2;
+    Real r2 = rx*rx+ry*ry+rz*rz;
 #endif
 
     Real const rho=1.0;
     Real phi, psi;
-    if (r2 > radius*radius) {
+
+    if (r2 > R*R) {
       phi = 0.0;
       psi = 1.0;
-    }  else if (x < 0) {
+    }  else if (rx < 0) {
       phi = 1.0;
       psi = 0.0;
     } else {
@@ -453,29 +457,33 @@ inline void LBM_init_double_emulsion(const Real radius,
 }
 
 // liquid lens of component C3 between layers of C1 and C2
-inline void LBM_init_liquid_lens(const int nx, const Real radius,
+inline void LBM_init_liquid_lens(const Real r,
 				 const Geometry& geom,
 				 MultiFab& mf,
 				 MultiFab& mg,
 				 MultiFab& mk,
 				 MultiFab& hydrovs) {
+  const IntVect box = geom.Domain().length();
+  const Real R = r*box[0];
+
   auto const & f = mf.arrays();
   auto const & g = mg.arrays();
   auto const & k = mk.arrays();
   GpuArray<Real,3> dx = geom.CellSizeArray();
   ParallelFor(mf, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-    Real rx = (x+0.5)*dx[0];
-    Real ry = (y+0.5)*dx[1];
+    Real rx = x-box[0]/2;
+    Real ry = y-box[1]/2;
 #if (AMREX_SPACEDIM == 2)
-    Real r2 = ((rx-0.5)*(rx-0.5)+(ry-0.5)*(ry-0.5));
+    Real r2 = rx*rx+ry*ry;
 #elif (AMREX_SPACEDIM == 3)
-    Real rz = (z+0.5)*dx[2];
-    Real r2 = ((rx-0.5)*(rx-0.5)+(ry-0.5)*(ry-0.5)+(rz-0.5)*(rz-0.5));
+    Real rz = z-box[0]/2;
+    Real r2 = rx*rx+ry*ry+rz*rz;
 #endif
 
     const Real rho = 1.0;
     Real phi, psi;
-    if (r2 < radius*radius) {
+
+    if (r2 < R*R) {
       phi = 0.0;
       psi = 1.0;
     } else if (rz > 0) {
