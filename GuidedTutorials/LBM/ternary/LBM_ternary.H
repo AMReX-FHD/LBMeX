@@ -47,13 +47,19 @@ inline Real laplacian(int x, int y, int z, const Array4<Real>& field, int icomp)
   return laplacian;
 }
 
-inline Array<Real,3> chemical_potentials(const Real& rho,
-					 const Real& phi,
-					 const Real& psi,
-					 const Real& D2rho,
-					 const Real& D2phi,
-					 const Real& D2psi) {
+inline Array<Real,3> chemical_potentials(const Array<Real,3>& fields,
+					 const Array<RealVect,3>& gradients,
+					 const Array<Real,3>& laplacians) {
   const Real alpha2 = alpha*alpha;
+  const Real rho = fields[0];
+  const Real phi = fields[1];
+  const Real psi = fields[2];
+  const RealVect Drho = gradients[0];
+  const RealVect Dphi = gradients[1];
+  const RealVect Dpsi = gradients[2];
+  const Real D2rho = laplacians[0];
+  const Real D2phi = laplacians[1];
+  const Real D2psi = laplacians[2];
 
   Array<Real,3> mu = { 0.0, 0.0, 0.0 } ;
 #if 0
@@ -137,18 +143,21 @@ inline void hydrovars(int x, int y, int z,
   h(x,y,z,5) = j[2]/rho;
 }
 
-inline Array<Real,nvel> fequilibrium(const Real& rho,
-				     const Real& phi,
-				     const Real& psi,
-				     const RealVect& u,
-				     const RealVect& Drho,
-				     const RealVect& Dphi,
-				     const RealVect& Dpsi,
-				     const Real& D2rho,
-				     const Real& D2phi,
-				     const Real& D2psi) {
+inline Array<Real,nvel> fequilibrium(const Array<Real,3>& fields,
+				     const Array<RealVect,3>& gradients,
+				     const Array<Real,3>& laplacians,
+				     const RealVect& u) {
   Array<Real,nvel> fEq;
 
+  const Real rho = fields[0];
+  const Real phi = fields[1];
+  const Real psi = fields[2];
+  const RealVect Drho = gradients[0];
+  const RealVect Dphi = gradients[1];
+  const RealVect Dpsi = gradients[2];
+  const Real D2rho = laplacians[0];
+  const Real D2phi = laplacians[1];
+  const Real D2psi = laplacians[2];
   const Real pbulk = pressure(rho, phi, psi);
 
   Real ruu[3][3];
@@ -271,25 +280,27 @@ inline void collide(int x, int y, int z,
 		    Array4<Real> k,
 		    Array4<Real> h) {
 
-  const Real rho = h(x,y,z,0);
-  const Real phi = h(x,y,z,1);
-  const Real psi = h(x,y,z,2);
+  const Array<Real,3> fields = { h(x,y,z,0), h(x,y,z,1), h(x,y,z,2) };
   const RealVect u = { h(x,y,z,3), h(x,y,z,4), h(x,y,z,5) };
 
-  const RealVect Drho = gradient(x,y,z,h,0);
-  const RealVect Dphi = gradient(x,y,z,h,1);
-  const RealVect Dpsi = gradient(x,y,z,h,2);
+  const Array<RealVect,3> gradients = {
+    gradient(x,y,z,h,0),
+    gradient(x,y,z,h,1),
+    gradient(x,y,z,h,2)
+  };
 
-  const Real D2rho = laplacian(x,y,z,h,0);
-  const Real D2phi = laplacian(x,y,z,h,1);
-  const Real D2psi = laplacian(x,y,z,h,2);
+  const Array<Real,3> laplacians = {
+    laplacian(x,y,z,h,0),
+    laplacian(x,y,z,h,1),
+    laplacian(x,y,z,h,2)
+  };
 
-  const Array<Real,3> mu = chemical_potentials(rho, phi, psi, D2rho, D2phi, D2psi);
+  const Array<Real,3> mu = chemical_potentials(fields, gradients, laplacians);
 
   Array<Real,nvel> fEq, gEq, kEq;
-  fEq = fequilibrium(rho, phi, psi, u, Drho, Dphi, Dpsi, D2rho, D2phi, D2psi);
-  gEq = gequilibrium(phi, mu[1], u);
-  kEq = kequilibrium(psi, mu[2], u);
+  fEq = fequilibrium(fields, gradients, laplacians, u);
+  gEq = gequilibrium(fields[1], mu[1], u);
+  kEq = kequilibrium(fields[2], mu[2], u);
 
   for (int i=0; i<nvel; ++i) {
     f(x,y,z,i) = f(x,y,z,i) - 1./tau_r * (f(x,y,z,i) - fEq[i]);
@@ -301,9 +312,12 @@ inline void collide(int x, int y, int z,
 
 // stream from \vec{x} to \vec{x}+\vec{c}_i (push scheme)
 inline void stream_push(int x, int y, int z,
-			const Array4<Real>& fOld, const Array4<Real>& gOld,
-			const Array4<Real>& kOld, const Array4<Real>& fNew,
-			const Array4<Real>& gNew, const Array4<Real>& kNew) {
+			const Array4<Real>& fOld,
+			const Array4<Real>& gOld,
+			const Array4<Real>& kOld,
+			const Array4<Real>& fNew,
+			const Array4<Real>& gNew,
+			const Array4<Real>& kNew) {
   for (int i=0; i<nvel; ++i) { // push populations to neighbors
     int xp = x + c[i][0];
     int yp = y + c[i][1];
