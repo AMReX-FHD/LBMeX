@@ -99,7 +99,7 @@ void main_driver(const char* argv) {
   MultiFab gnew(ba, dm, nvel, nghost);
   MultiFab kold(ba, dm, nvel, nghost);
   MultiFab knew(ba, dm, nvel, nghost);
-  MultiFab hydrovs(ba, dm, nhydro, 0);
+  MultiFab hydrovs(ba, dm, nhydro, nghost);
 
   // set up variable names for output
   const Vector<std::string> var_names = VariableNames(nhydro);
