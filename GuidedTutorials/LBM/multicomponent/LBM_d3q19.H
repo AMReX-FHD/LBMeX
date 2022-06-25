@@ -1,7 +1,7 @@
 #ifndef LBM_D3Q19_H_
 #define LBM_D3Q19_H_
 
-const int ncomp = 19;
+const int nvel = 19;
 
 const Real cs2 = 1./3.;
 
@@ -71,12 +71,34 @@ const Real b[19] = {
   4./9.
 };
 
-inline Array<Real,ncomp> moments(int x, int y, int z, const Array4<Real>& fsite, const Array4<Real>& m) {
+const Real wg[19] = {
+  { {      0., 0., 0. }, { 0.,     0.,  0. }, { 0., 0.,     0.  } },
+  { {  5./36., 0., 0. }, { 0., -1./9.,  0. }, { 0., 0., -1./9.  } },
+  { { -1./9.,  0., 0. }, { 0.,  5./36., 0. }, { 0., 0., -1./9.  } },
+  { {  5./36., 0., 0. }, { 0., -1./9.,  0. }, { 0., 0., -1./9.  } },
+  { { -1./9.,  0., 0. }, { 0.,  5./36., 0. }, { 0., 0., -1./9.  } },
+  { { -1./9.,  0., 0. }, { 0., -1./9.,  0. }, { 0., 0.,  5./36. } },
+  { { -1./9.,  0., 0. }, { 0., -1./9.,  0. }, { 0., 0.,  5./36. } },
+  { { -1./72.,  1./12., 0. }, {  1./12., -1./72., 0. }, { 0., 0.,  1./36. } },
+  { { -1./72., -1./12., 0. }, { -1./12., -1./72., 0. }, { 0., 0.,  1./36. } },
+  { { -1./72., -1./12., 0. }, { -1./12., -1./72., 0. }, { 0., 0.,  1./36. } },
+  { { -1./72.,  1./12., 0. }, {  1./12., -1./72., 0. }, { 0., 0.,  1./36. } },
+  { { -1./72., 0.,  1./12. }, { 0.,  1./36., 0. }, {  1./12., 0., -1./72. } },
+  { { -1./72., 0., -1./12. }, { 0.,  1./36., 0. }, { -1./12., 0., -1./72. } },
+  { { -1./72., 0., -1./12. }, { 0.,  1./36., 0. }, { -1./12., 0., -1./72. } },
+  { { -1./72., 0.,  1./12. }, { 0.,  1./36., 0. }, {  1./12., 0., -1./72. } },
+  { {  1./36., 0., 0. }, { 0., -1./72.,  1./12. }, { 0.,  1./12., -1./72. } },
+  { {  1./36., 0., 0. }, { 0., -1./72., -1./12. }, { 0., -1./12., -1./72. } },
+  { {  1./36., 0., 0. }, { 0., -1./72., -1./12. }, { 0., -1./12., -1./72. } },
+  { {  1./36., 0., 0. }, { 0., -1./72.,  1./12. }, { 0.,  1./12., -1./72. } },
+};
+
+inline Array<Real,nvel> moments(int x, int y, int z, const Array4<Real>& fsite, const Array4<Real>& m) {
   Real f;
   Real mc0, mc1, mc2;
   Real mx1, my1, mz1, mx2, my2, mz2, mx3, my3, mz3;
   Real mxy, mxz, myz, mxx1, myy1, mzz1, mxx2, myy2, mzz2;
-  Array<Real,ncomp> mom;
+  Array<Real,nvel> mom;
 
   f = fsite(x,y,z, 0); mc0  = f;
   f = fsite(x,y,z, 1); mx1  = f; mxx1  = f;
@@ -124,8 +146,8 @@ inline Array<Real,ncomp> moments(int x, int y, int z, const Array4<Real>& fsite,
   return mom;
 }
 
-inline void populations(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite) {
-  Array<Real,ncomp> m;
+inline Array<Real,nvel> populations(int x, int y, int z, const Array4<Real>& f, const Array4<Real>& msite) {
+  Array<Real,nvel> fi, m;
 
   Real mc0, mc1, mc2;
   Real mx1, my1, mz1, mx2, my2, mz2, mx3, my3, mz3;
@@ -179,31 +201,31 @@ inline void populations(int x, int y, int z, const Array4<Real>& f, const Array4
   myz = m[8];
   mxz = m[9];
 
-  f(x,y,z, 0) = mc0;
-  f(x,y,z, 1) = mxx1 + mx1;
-  f(x,y,z, 2) = mxx1 - mx1;
-  f(x,y,z, 3) = myy1 + my1;
-  f(x,y,z, 4) = myy1 - my1;
-  f(x,y,z, 5) = mzz1 + mz1;
-  f(x,y,z, 6) = mzz1 - mz1;
-  f(x,y,z, 7) = mxy2 + mx2 + my3 + mxy;
-  f(x,y,z, 8) = mxy2 - mx2 - my3 + mxy;
-  f(x,y,z, 9) = mxy2 + mx2 - my3 - mxy;
-  f(x,y,z,10) = mxy2 - mx2 + my3 - mxy;
-  f(x,y,z,11) = myz2 + my2 + mz3 + myz;
-  f(x,y,z,12) = myz2 - my2 - mz3 + myz;
-  f(x,y,z,13) = myz2 + my2 - mz3 - myz;
-  f(x,y,z,14) = myz2 - my2 + mz3 - myz;
-  f(x,y,z,15) = mxz2 + mz2 + mx3 + mxz;
-  f(x,y,z,16) = mxz2 - mz2 - mx3 + mxz;
-  f(x,y,z,17) = mxz2 - mz2 + mx3 - mxz;
-  f(x,y,z,18) = mxz2 + mz2 - mx3 - mxz;
+  fi[ 0] =f(x,y,z, 0) = mc0;
+  fi[ 1] =f(x,y,z, 1) = mxx1 + mx1;
+  fi[ 2] =f(x,y,z, 2) = mxx1 - mx1;
+  fi[ 3] =f(x,y,z, 3) = myy1 + my1;
+  fi[ 4] =f(x,y,z, 4) = myy1 - my1;
+  fi[ 5] =f(x,y,z, 5) = mzz1 + mz1;
+  fi[ 6] =f(x,y,z, 6) = mzz1 - mz1;
+  fi[ 7] =f(x,y,z, 7) = mxy2 + mx2 + my3 + mxy;
+  fi[ 8] =f(x,y,z, 8) = mxy2 - mx2 - my3 + mxy;
+  fi[ 9] =f(x,y,z, 9) = mxy2 + mx2 - my3 - mxy;
+  fi[10] =f(x,y,z,10) = mxy2 - mx2 + my3 - mxy;
+  fi[11] =f(x,y,z,11) = myz2 + my2 + mz3 + myz;
+  fi[12] =f(x,y,z,12) = myz2 - my2 - mz3 + myz;
+  fi[13] =f(x,y,z,13) = myz2 + my2 - mz3 - myz;
+  fi[14] =f(x,y,z,14) = myz2 - my2 + mz3 - myz;
+  fi[15] =f(x,y,z,15) = mxz2 + mz2 + mx3 + mxz;
+  fi[16] =f(x,y,z,16) = mxz2 - mz2 - mx3 + mxz;
+  fi[17] =f(x,y,z,17) = mxz2 - mz2 + mx3 - mxz;
+  fi[18] =f(x,y,z,18) = mxz2 + mz2 - mx3 - mxz;
 
-  return;
+  return fi;
 }
 
-inline Array<Real,ncomp> hydrovars(const Array<Real,ncomp>& m) {
-  Array<Real,ncomp> h;
+inline Array<Real,nvel> hydrovars(const Array<Real,nvel>& m) {
+  Array<Real,nvel> h;
 
   h[0] = m[0]; // rho
   h[1] = m[1]; // jx
@@ -231,8 +253,8 @@ inline Array<Real,ncomp> hydrovars(const Array<Real,ncomp>& m) {
   return h;
 }
 
-inline Array<Real,ncomp> mequilibrium(const Real& rho, const RealVect& u) {
-  Array<Real,ncomp> mEq;
+inline Array<Real,nvel> mequilibrium(const Real& rho, const RealVect& u) {
+  Array<Real,nvel> mEq;
 
   /* mass density */
   mEq[0] = rho;
@@ -251,12 +273,12 @@ inline Array<Real,ncomp> mequilibrium(const Real& rho, const RealVect& u) {
   mEq[9] = u[2]*u[0]*rho;
 
   /* ghost modes have no equilibrium part due to orthogonality */
-  for (int i=10; i<ncomp; ++i) mEq[i] = 0.0;
+  for (int i=10; i<nvel; ++i) mEq[i] = 0.0;
 
   return mEq;
 }
 
-inline Array<Real,ncomp> mequilibrium(int x, int y, int z, const Array4<Real>& m) {
+inline Array<Real,nvel> mequilibrium(int x, int y, int z, const Array4<Real>& m) {
   const Real rho = m(x,y,z,0);
   const RealVect j = { m(x,y,z,1), m(x,y,z,2), m(x,y,z,3) };
   return mequilibrium(rho, j/rho);

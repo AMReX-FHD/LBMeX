@@ -57,10 +57,10 @@ void main_driver(const char* argv) {
   DistributionMapping dm(ba);
 
   // set up MultiFabs
-  MultiFab fold(ba, dm, ncomp, nghost);
-  MultiFab fnew(ba, dm, ncomp, nghost);
-  MultiFab moments(ba, dm, ncomp, 0);
-  MultiFab hydrovs(ba, dm, ncomp, 0);
+  MultiFab fold(ba, dm, nvel, nghost);
+  MultiFab fnew(ba, dm, nvel, nghost);
+  MultiFab moments(ba, dm, nvel, 0);
+  MultiFab hydrovs(ba, dm, nvel, 0);
 
   // set variable names for output
   int numVars = moments.nComp();
@@ -101,7 +101,7 @@ void main_driver(const char* argv) {
   ParallelFor(fold, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
     const Real uy = A*std::sin(2.*M_PI*x/nx);
     const RealVect u = {0., uy, 0. };
-    for (int i=0; i<ncomp; ++i) {
+    for (int i=0; i<nvel; ++i) {
       m[nbx](x,y,z,i) = mequilibrium(density, u)[i];
       f[nbx](x,y,z,i) = fequilibrium(density, u)[i];
     }
