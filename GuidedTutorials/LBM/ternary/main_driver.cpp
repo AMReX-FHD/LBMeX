@@ -33,6 +33,7 @@ inline Vector<std::string> VariableNames(const int numVars) {
     name += (120+d);
     var_names[cnt++] = name;
   }
+  var_names[cnt++] = "p_bulk";
   // pxx, pxy, pxz, pyy, pyz, pzz
   for (int i=0; i<AMREX_SPACEDIM, cnt<numVars; ++i) {
     for (int j=i; j<AMREX_SPACEDIM, cnt<numVars; ++j) {
@@ -90,7 +91,7 @@ void main_driver(const char* argv) {
   int nghost = 2;
 
   // number of hydrodynamic fields to output
-  int nhydro = 6;
+  int nhydro = 7;
 
   // set up MultiFabs
   MultiFab fold(ba, dm, nvel, nghost);

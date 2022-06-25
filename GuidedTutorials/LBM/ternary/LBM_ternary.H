@@ -141,6 +141,7 @@ inline void hydrovars(int x, int y, int z,
   h(x,y,z,3) = j[0]/rho;
   h(x,y,z,4) = j[1]/rho;
   h(x,y,z,5) = j[2]/rho;
+  h(x,y,z,6) = pressure(rho,phi,psi);
 }
 
 inline Array<Real,nvel> fequilibrium(const Array<Real,3>& fields,
