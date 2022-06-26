@@ -3,13 +3,13 @@
 
 #include "LBM_d3q19.H"
 
-Real tau_r = 1.0,
-     tau_p = 1.0;
+Real tau_r = 0.5*(1.+1./sqrt(3.)); // minimizes spurious currents
+Real tau_p = 1.0;
 
-Real kappa = 0.005;
+Real kappa = 0.01;
 
-Real T = 0.001;
-Real lambda = 2.5*T;
+Real lambda = 1.1;
+Real T = 0.5;
 
 Real Gamma = 1.0;
 
