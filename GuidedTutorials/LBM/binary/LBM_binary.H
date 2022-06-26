@@ -60,7 +60,7 @@ inline Array<Real,2> chemical_potentials(const Array<Real,2>& fields,
 
 inline Real pressure(Real rho, Real phi) {
 
-  Real p0 = rho*cs2 + rho*T; // Eq. (40) in Swift et al.
+  Real p0 = rho*T; // Eq. (40) in Swift et al.
   // note that gradient terms are included in fequilibrium
 
   return p0;
