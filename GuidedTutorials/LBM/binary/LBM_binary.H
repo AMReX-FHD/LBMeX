@@ -4,24 +4,14 @@
 #include "LBM_d3q19.H"
 
 Real tau_r = 1.0,
-     tau_p = 1.0,
-     tau_s = 0.666667;
+     tau_p = 1.0;
 
-Real kappa1 = 0.01,
-     kappa2 = 0.01,
-     kappa3 = 0.01;
+Real kappa = 0.005;
 
-Real kappa_rr = (kappa1+kappa2)/4.,
-     kappa_pp = kappa_rr,
-     kappa_ss = (kappa1+kappa2+4.*kappa3)/4.,
-     kappa_rp = (kappa1-kappa2)/4.,
-     kappa_ps = -kappa_rp,
-     kappa_rs = -kappa_rr;
+Real T = 0.001;
+Real lambda = 2.5*T;
 
-Real gamma_p = 1.0,
-     gamma_s = 1.0;
-
-Real alpha = 1.0;
+Real Gamma = 1.0;
 
 inline RealVect gradient(int x, int y, int z, const Array4<Real>& field, int icomp) {
   RealVect gradient = { 0.0, 0.0, 0.0 };
@@ -50,61 +40,28 @@ inline Real laplacian(int x, int y, int z, const Array4<Real>& field, int icomp)
 inline Array<Real,2> chemical_potentials(const Array<Real,2>& fields,
 					 const Array<RealVect,2>& gradients,
 					 const Array<Real,2>& laplacians) {
-  const Real alpha2 = alpha*alpha;
   const Real rho = fields[0];
   const Real phi = fields[1];
-  const Real psi = fields[2];
-  const RealVect Drho = gradients[0];
-  const RealVect Dphi = gradients[1];
-  const RealVect Dpsi = gradients[2];
   const Real D2rho = laplacians[0];
   const Real D2phi = laplacians[1];
-  const Real D2psi = laplacians[2];
 
   Array<Real,2> mu = { 0.0, 0.0 } ;
 #if 0
   /* mu_rho is not needed for the calculations.
-     The following expression has not been tested.
-     (Eq. (38) in Semprebon et al. may contain typos) */
-  mu[0] =
-      kappa1/8.*(rho+psi-phi)*(rho+phi-psi-2.)*(rho+phi-psi-1.)
-    + kappa2/8.*(rho-phi-psi)*(rho-phi-psi-2.)*(rho-phi-psi-1.)
-    - alpha2/4.*((kappa1+kappa2)*(D2rho-D2psi)-(kappa1-kappa2)*D2phi);
+     The following expression has not been tested. */
+  mu[0] = lambda/4.*(1.+phi2/rho2) + T/2*log((rho2-phi2)/4) - kappa*D2rho;
 #endif
 
-  mu[1] = // Eq. (39) in Semprebon et al.
-      kappa1/8.*(rho+phi-psi)*(rho+phi-psi-2.)*(rho+phi-psi-1.)
-    - kappa2/8.*(rho-phi-psi)*(rho-phi-psi-2.)*(rho-phi-psi-1.)
-    - alpha2/4.*((kappa1-kappa2)*(D2rho-D2psi)+(kappa1+kappa2)*D2phi);
+  mu[1] = // Eq. (38) in Swift et al.
+    - lambda/2.*phi/rho + T/2*log((rho+phi)/(rho-phi)) - kappa*D2phi;
 
   return mu;
 }
 
-inline Real pressure(Real rho, Real phi, Real psi) {
-  const Real rho2 = rho*rho;
-  const Real rho3 = rho2*rho;
-  const Real rho4 = rho3*rho;
-  const Real phi2 = phi*phi;
-  const Real phi3 = phi2*phi;
-  const Real phi4 = phi3*phi;
-  const Real psi2 = psi*psi;
-  const Real psi3 = psi2*psi;
-  const Real psi4 = psi3*psi;
+inline Real pressure(Real rho, Real phi) {
 
-  Real p0 = rho*cs2 // Eq. (43) Semprebon et al.
-    + (kappa1+kappa2)*(3./32.*(rho4+phi4+psi4)
-		       - 1./4.*(rho3+rho*psi-psi3)
-		       + 1./8.*(rho2+phi2+psi2)
-		       - 3./8.*(rho3*psi+psi3*rho)
-		       + 9./16.*(rho2*phi2+rho2*psi2+phi2*psi2)
-		       + 3./4.*(rho2*psi-rho*phi2-rho*psi2+phi2*psi)
-		       - 9./8.*phi2*psi*rho)
-    + (kappa1-kappa2)*(3./8.*(rho3*phi+rho*phi3-phi3*psi-phi*psi3)
-		       + 1./4.*(rho*phi-phi*psi-phi3)
-		       + 9./8.*(phi*psi2*rho-phi*psi*rho2)
-		       - 3./4.*(rho2*phi+phi*psi2)
-		       + 3./2.*phi*psi*rho)
-    + kappa3*(3./2.*psi4 - 2.*psi3 + 1./2.*psi2);
+  Real p0 = rho*cs2 + rho*T; // Eq. (40) in Swift et al.
+  // note that gradient terms are included in fequilibrium
 
   return p0;
 }
@@ -113,15 +70,14 @@ inline void hydrovars(int x, int y, int z,
 		      const Array4<Real>& f,
 		      const Array4<Real>& g,
 		      const Array4<Real>& h) {
-  Real rho, phi, psi, j[3];
-  rho = phi = psi = j[0] = j[1] = j[2] = 0.0;
+  Real rho, phi, j[3];
+  rho = phi = j[0] = j[1] = j[2] = 0.0;
   for (int i=0; i<nvel; ++i) {
-    Real fi, gi, ki;
+    Real fi, gi;
     fi = f(x,y,z,i);
     gi = g(x,y,z,i);
     rho  += fi;
     phi  += gi;
-    psi  += ki;
     j[0] += fi*c[i][0];
     j[1] += fi*c[i][1];
     j[2] += fi*c[i][2];
@@ -131,7 +87,7 @@ inline void hydrovars(int x, int y, int z,
   h(x,y,z,2) = j[0]/rho;
   h(x,y,z,3) = j[1]/rho;
   h(x,y,z,4) = j[2]/rho;
-  h(x,y,z,5) = pressure(rho,phi,psi);
+  h(x,y,z,5) = pressure(rho,phi);
 }
 
 inline Array<Real,nvel> fequilibrium(const Array<Real,2>& fields,
@@ -142,14 +98,11 @@ inline Array<Real,nvel> fequilibrium(const Array<Real,2>& fields,
 
   const Real rho = fields[0];
   const Real phi = fields[1];
-  const Real psi = fields[2];
   const RealVect Drho = gradients[0];
   const RealVect Dphi = gradients[1];
-  const RealVect Dpsi = gradients[2];
   const Real D2rho = laplacians[0];
   const Real D2phi = laplacians[1];
-  const Real D2psi = laplacians[2];
-  const Real pbulk = pressure(rho, phi, psi);
+  const Real pbulk = pressure(rho, phi);
 
   Real ruu[3][3];
   ruu[0][0] = rho*u[0]*u[0];
@@ -159,46 +112,26 @@ inline Array<Real,nvel> fequilibrium(const Array<Real,2>& fields,
   ruu[1][2] = rho*u[1]*u[2];
   ruu[2][0] = rho*u[2]*u[0];
 
-  Real G[3][3];
-  G[0][0] = kappa_rr*Drho[0]*Drho[0]+kappa_pp*Dphi[0]*Dphi[0]+kappa_ss*Dpsi[0]*Dpsi[0];
-  G[1][1] = kappa_rr*Drho[1]*Drho[1]+kappa_pp*Dphi[1]*Dphi[1]+kappa_ss*Dpsi[1]*Dpsi[1];
-  G[2][2] = kappa_rr*Drho[2]*Drho[2]+kappa_pp*Dphi[2]*Dphi[2]+kappa_ss*Dpsi[2]*Dpsi[2];
-  G[0][1] = kappa_rr*Drho[0]*Drho[1]+kappa_pp*Dphi[0]*Dphi[1]+kappa_ss*Dpsi[0]*Dpsi[1];
-  G[1][2] = kappa_rr*Drho[1]*Drho[2]+kappa_pp*Dphi[1]*Dphi[2]+kappa_ss*Dpsi[1]*Dpsi[2];
-  G[2][0] = kappa_rr*Drho[2]*Drho[0]+kappa_pp*Dphi[2]*Dphi[0]+kappa_ss*Dpsi[2]*Dpsi[0];
+  Real G[3][3]; // Eq. (39) in Swift et al.
+  G[0][0] = kappa*Drho[0]*Drho[0] + kappa*Dphi[0]*Dphi[0];
+  G[1][1] = kappa*Drho[1]*Drho[1] + kappa*Dphi[1]*Dphi[1];
+  G[2][2] = kappa*Drho[2]*Drho[2] + kappa*Dphi[2]*Dphi[2];
+  G[0][1] = kappa*Drho[0]*Drho[1] + kappa*Dphi[0]*Dphi[1];
+  G[1][2] = kappa*Drho[1]*Drho[2] + kappa*Dphi[1]*Dphi[2];
+  G[2][0] = kappa*Drho[2]*Drho[0] + kappa*Dphi[2]*Dphi[0];
 
   Real fi, sumf = 0.0;
-  for (int i=1; i<nvel; ++i) { // Eq. (52) Semprebon et al.
+  for (int i=1; i<nvel; ++i) {
     fi  = 3.*w[i]*pbulk;
     fi += 3.*w[i]*rho*(u[0]*c[i][0]+u[1]*c[i][1]+u[2]*c[i][2]);
     fi += 9./2.*w[i]*((ruu[0][0]*c[i][0]+2.*ruu[0][1]*c[i][1])*c[i][0]
-			 +(ruu[1][1]*c[i][1]+2.*ruu[1][2]*c[i][2])*c[i][1]
-			 +(ruu[2][2]*c[i][2]+2.*ruu[2][0]*c[i][0])*c[i][2]);
+		     +(ruu[1][1]*c[i][1]+2.*ruu[1][2]*c[i][2])*c[i][1]
+		     +(ruu[2][2]*c[i][2]+2.*ruu[2][0]*c[i][0])*c[i][2]);
     fi -= 3./2.*w[i]*(ruu[0][0]+ruu[1][1]+ruu[2][2]);
-    fi -= 3.*w[i]*(kappa_rr*rho*D2rho+kappa_pp*phi*D2phi+kappa_ss*psi*D2psi);
-    fi -= 3.*w[i]*(kappa_rp*(rho*D2phi+phi*D2rho)
-		      +kappa_rs*(rho*D2psi+psi*D2rho)
-		      +kappa_ps*(phi*D2psi+psi*D2phi));
+    // gradient terms
+    fi -= 3.*w[i]*(kappa*rho*D2rho+kappa*phi*D2phi);
     fi += 3.*(wg[i][0][0]*G[0][0]+wg[i][1][1]*G[1][1]+wg[i][2][2]*G[2][2]
-	      +wg[i][0][1]*G[0][1]+wg[i][1][2]*G[1][2]+wg[i][2][0]*G[2][0]);
-    fi += 6.*kappa_rp*(wg[i][0][0]*Drho[0]*Dphi[0]
-		       +wg[i][1][1]*Drho[1]*Dphi[1]
-		       +wg[i][2][2]*Drho[2]*Dphi[2]);
-    fi += 6.*kappa_rs*(wg[i][0][0]*Drho[0]*Dpsi[0]
-		       +wg[i][1][1]*Drho[1]*Dpsi[1]
-		       +wg[i][2][2]*Drho[2]*Dpsi[2]);
-    fi += 6.*kappa_ps*(wg[i][0][0]*Dphi[0]*Dpsi[0]
-		       +wg[i][1][1]*Dphi[1]*Dpsi[1]
-		       +wg[i][2][2]*Dphi[2]*Dpsi[2]);
-    fi += 3.*kappa_rp*(wg[i][0][1]*(Drho[0]*Dphi[1]+Drho[1]*Dphi[0])
-		       +wg[i][1][2]*(Drho[1]*Dphi[2]+Drho[2]*Dphi[1])
-		       +wg[i][2][0]*(Drho[2]*Dphi[0]+Drho[0]*Dphi[2]));
-    fi += 3.*kappa_rs*(wg[i][0][1]*(Drho[0]*Dpsi[1]+Drho[1]*Dpsi[0])
-		       +wg[i][1][2]*(Drho[1]*Dpsi[2]+Drho[2]*Dpsi[1])
-		       +wg[i][2][0]*(Drho[2]*Dpsi[0]+Drho[0]*Dpsi[2]));
-    fi += 3.*kappa_ps*(wg[i][0][1]*(Dphi[0]*Dpsi[1]+Dphi[1]*Dpsi[0])
-		       +wg[i][1][2]*(Dphi[1]*Dpsi[2]+Dphi[2]*Dpsi[1])
-		       +wg[i][2][0]*(Dphi[2]*Dpsi[0]+Dphi[0]*Dpsi[2]));
+	     +wg[i][0][1]*G[0][1]+wg[i][1][2]*G[1][2]+wg[i][2][0]*G[2][0]);
     fEq[i] = fi;
     sumf += fi;
   }
@@ -221,12 +154,12 @@ inline Array<Real,nvel> gequilibrium(const Real& phi,
   puu[2][0] = phi*u[2]*u[0];
 
   Real gi, sumg = 0.0;
-  for (int i=1; i<nvel; ++i) { // Eq. (53) Semprebon et al.
-    gi  = 3.*w[i]*gamma_p*mu_phi;
+  for (int i=1; i<nvel; ++i) {
+    gi  = 3.*w[i]*Gamma*mu_phi;
     gi += 3.*w[i]*phi*(u[0]*c[i][0]+u[1]*c[i][1]+u[2]*c[i][2]);
     gi += 9./2.*w[i]*((puu[0][0]*c[i][0]+2.*puu[0][1]*c[i][1])*c[i][0]
-			 +(puu[1][1]*c[i][1]+2.*puu[1][2]*c[i][2])*c[i][1]
-			 +(puu[2][2]*c[i][2]+2.*puu[2][0]*c[i][0])*c[i][2]);
+		     +(puu[1][1]*c[i][1]+2.*puu[1][2]*c[i][2])*c[i][1]
+		     +(puu[2][2]*c[i][2]+2.*puu[2][0]*c[i][0])*c[i][2]);
     gi -= 3./2.*w[i]*(puu[0][0]+puu[1][1]+puu[2][2]);
     gEq[i] = gi;
     sumg += gi;
@@ -370,9 +303,9 @@ inline void LBM_init_droplet(const Real r,
     Real phi;
 
     if (r2 < R*R) {
-      phi = 1.0;
+      phi = 0.5;
     } else {
-      phi = -1.0;
+      phi = -0.5;
     }
 
     for (int i=0; i<nvel; i++) {
