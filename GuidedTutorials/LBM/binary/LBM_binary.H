@@ -277,6 +277,44 @@ inline void LBM_init_mixture(MultiFab& mf,
   LBM_hydrovars(mf, mg, hydrovs);
 }
 
+// flat interface between C1 and C2
+inline void LBM_init_flat_interface(const Geometry& geom,
+				    MultiFab& mf,
+				    MultiFab& mg,
+				    MultiFab& hydrovs) {
+  const IntVect box = geom.Domain().length();
+
+  auto const & f = mf.arrays();
+  auto const & g = mg.arrays();
+  GpuArray<Real,3> dx = geom.CellSizeArray();
+  ParallelFor(mf, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
+    const Real rx = x-box[0]/2;
+    const Real ry = y-box[1]/2;
+#if (AMREX_SPACEDIM == 2)
+    const Real r2 = rx*rx+ry*ry;
+#elif (AMREX_SPACEDIM == 3)
+    const Real rz = z-box[0]/2;
+    const Real r2 = rx*rx+ry*ry+rz*rz;
+#endif
+
+    const Real rho=1.0;
+    Real phi;
+
+    if (rx < 0.) {
+      phi = 0.5;
+    } else {
+      phi = -0.5;
+    }
+
+    for (int i=0; i<nvel; i++) {
+      f[nbx](x,y,z,i) = w[i]*rho;
+      g[nbx](x,y,z,i) = w[i]*phi;
+    }
+
+  });
+  LBM_hydrovars(mf, mg, hydrovs);
+}
+
 // binary droplet of C1 and C2
 inline void LBM_init_droplet(const Real r,
 			     const Geometry& geom,
@@ -290,13 +328,13 @@ inline void LBM_init_droplet(const Real r,
   auto const & g = mg.arrays();
   GpuArray<Real,3> dx = geom.CellSizeArray();
   ParallelFor(mf, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-    Real rx = x-box[0]/2;
-    Real ry = y-box[1]/2;
+    const Real rx = x-box[0]/2;
+    const Real ry = y-box[1]/2;
 #if (AMREX_SPACEDIM == 2)
-    Real r2 = rx*rx+ry*ry;
+    const Real r2 = rx*rx+ry*ry;
 #elif (AMREX_SPACEDIM == 3)
-    Real rz = z-box[0]/2;
-    Real r2 = rx*rx+ry*ry+rz*rz;
+    const Real rz = z-box[0]/2;
+    const Real r2 = rx*rx+ry*ry+rz*rz;
 #endif
 
     const Real rho=1.0;

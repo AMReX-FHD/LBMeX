@@ -70,6 +70,7 @@ void main_driver(const char* argv) {
   pp.query("max_grid_size", max_grid_size);
   pp.query("nsteps", nsteps);
   pp.query("plot_int", plot_int);
+  pp.query("T", T);
 
   // set up Box and Geomtry
   IntVect dom_lo(0, 0, 0);
@@ -106,7 +107,7 @@ void main_driver(const char* argv) {
   const Vector<std::string> var_names = VariableNames(nhydro);
 
   // INITIALIZE
-  LBM_init_mixture(fold, gold, hydrovs);
+  LBM_init_flat_interface(geom, fold, gold, hydrovs);
   // Write a plotfile of the initial data if plot_int > 0
   if (plot_int > 0)
     WriteOutput(0, hydrovs, var_names, geom);
