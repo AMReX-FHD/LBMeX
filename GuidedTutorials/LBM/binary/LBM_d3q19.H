@@ -5,7 +5,7 @@ const int nvel = 19;
 
 const Real cs2 = 1./3.;
 
-const IntVect c[19] = {
+AMREX_GPU_MANAGED IntVect c[19] = {
   {  0,  0,  0 },
   {  1,  0,  0 },
   { -1,  0,  0 },
@@ -27,7 +27,7 @@ const IntVect c[19] = {
   { -1,  0,  1 }
 };
 
-const Real w[19] = {
+AMREX_GPU_MANAGED Real w[19] = {
   1./3.,
   1./18.,
   1./18.,
@@ -71,7 +71,7 @@ const Real b[19] = {
   4./9.
 };
 
-const Real wg[19][3][3] = {
+AMREX_GPU_MANAGED Real wg[19][3][3] = {
   { {      0., 0., 0. }, { 0.,     0.,  0. }, { 0., 0.,     0.  } },
   { {  5./36., 0., 0. }, { 0., -1./9.,  0. }, { 0., 0., -1./9.  } },
   { {  5./36., 0., 0. }, { 0., -1./9.,  0. }, { 0., 0., -1./9.  } },
