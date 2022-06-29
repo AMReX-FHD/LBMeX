@@ -42,22 +42,22 @@ Real laplacian(int x, int y, int z, const Array4<Real>& field, int icomp) {
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-Array<Real,2> chemical_potentials(const Array<Real,2>& fields,
-				  const Array<RealVect,2>& gradients,
-				  const Array<Real,2>& laplacians) {
-  const Real rho = fields[0];
-  const Real phi = fields[1];
-  const Real D2rho = laplacians[0];
-  const Real D2phi = laplacians[1];
+Array1D<Real,0,2> chemical_potentials(const Array1D<Real,0,2>& fields,
+				  const Array1D<RealVect,0,2>& gradients,
+				  const Array1D<Real,0,2>& laplacians) {
+  const Real rho = fields(0);
+  const Real phi = fields(1);
+  const Real D2rho = laplacians(0);
+  const Real D2phi = laplacians(1);
 
-  Array<Real,2> mu = { 0.0, 0.0 } ;
+  Array1D<Real,0,2> mu = { 0.0, 0.0 } ;
 #if 0
   /* mu_rho is not needed for the calculations.
      The following expression has not been tested. */
-  mu[0] = lambda/4.*(1.+phi2/rho2) + T/2*log((rho2-phi2)/4) - kappa*D2rho;
+  mu(0) = lambda/4.*(1.+phi2/rho2) + T/2*log((rho2-phi2)/4) - kappa*D2rho;
 #endif
 
-  mu[1] = // Eq. (38) in Swift et al.
+  mu(1) = // Eq. (38) in Swift et al.
     - lambda/2.*phi/rho + T/2*log((rho+phi)/(rho-phi)) - kappa*D2phi;
 
   return mu;
@@ -98,18 +98,18 @@ void hydrovars(int x, int y, int z,
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-Array<Real,nvel> fequilibrium(const Array<Real,2>& fields,
-			      const Array<RealVect,2>& gradients,
-			      const Array<Real,2>& laplacians,
+Array1D<Real,0,nvel> fequilibrium(const Array1D<Real,0,2>& fields,
+			      const Array1D<RealVect,0,2>& gradients,
+			      const Array1D<Real,0,2>& laplacians,
 			      const RealVect& u) {
-  Array<Real,nvel> fEq;
+  Array1D<Real,0,nvel> fEq;
 
-  const Real rho = fields[0];
-  const Real phi = fields[1];
-  const RealVect Drho = gradients[0];
-  const RealVect Dphi = gradients[1];
-  const Real D2rho = laplacians[0];
-  const Real D2phi = laplacians[1];
+  const Real rho = fields(0);
+  const Real phi = fields(1);
+  const RealVect Drho = gradients(0);
+  const RealVect Dphi = gradients(1);
+  const Real D2rho = laplacians(0);
+  const Real D2phi = laplacians(1);
   const Real pbulk = pressure(rho, phi);
 
   Real ruu[3][3];
@@ -140,19 +140,19 @@ Array<Real,nvel> fequilibrium(const Array<Real,2>& fields,
     fi -= 3.*w[i]*(kappa*rho*D2rho+kappa*phi*D2phi);
     fi += 3.*(wg[i][0][0]*G[0][0]+wg[i][1][1]*G[1][1]+wg[i][2][2]*G[2][2]
 	     +wg[i][0][1]*G[0][1]+wg[i][1][2]*G[1][2]+wg[i][2][0]*G[2][0]);
-    fEq[i] = fi;
+    fEq(i) = fi;
     sumf += fi;
   }
-  fEq[0] = rho - sumf;
+  fEq(0) = rho - sumf;
 
   return fEq;
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-Array<Real,nvel> gequilibrium(const Real& phi,
+Array1D<Real,0,nvel> gequilibrium(const Real& phi,
 			      const Real& mu_phi,
 			      const RealVect& u) {
-  Array<Real,nvel> gEq;
+  Array1D<Real,0,nvel> gEq;
 
   Real puu[3][3];
   puu[0][0] = phi*u[0]*u[0];
@@ -170,10 +170,10 @@ Array<Real,nvel> gequilibrium(const Real& phi,
 		     +(puu[1][1]*c[i][1]+2.*puu[1][2]*c[i][2])*c[i][1]
 		     +(puu[2][2]*c[i][2]+2.*puu[2][0]*c[i][0])*c[i][2]);
     gi -= 3./2.*w[i]*(puu[0][0]+puu[1][1]+puu[2][2]);
-    gEq[i] = gi;
+    gEq(i) = gi;
     sumg += gi;
   }
-  gEq[0] = phi - sumg;
+  gEq(0) = phi - sumg;
 
   return gEq;
 }
@@ -184,28 +184,28 @@ void collide(int x, int y, int z,
 	     Array4<Real> g,
 	     Array4<Real> h) {
 
-  const Array<Real,2> fields = { h(x,y,z,0), h(x,y,z,1) };
+  const Array1D<Real,0,2> fields = { h(x,y,z,0), h(x,y,z,1) };
   const RealVect u = { h(x,y,z,2), h(x,y,z,3), h(x,y,z,4) };
 
-  const Array<RealVect,2> gradients = {
+  const Array1D<RealVect,0,2> gradients = {
     gradient(x,y,z,h,0),
     gradient(x,y,z,h,1),
   };
 
-  const Array<Real,2> laplacians = {
+  const Array1D<Real,0,2> laplacians = {
     laplacian(x,y,z,h,0),
     laplacian(x,y,z,h,1),
   };
 
-  const Array<Real,2> mu = chemical_potentials(fields, gradients, laplacians);
+  const Array1D<Real,0,2> mu = chemical_potentials(fields, gradients, laplacians);
 
-  Array<Real,nvel> fEq, gEq;
+  Array1D<Real,0,nvel> fEq, gEq;
   fEq = fequilibrium(fields, gradients, laplacians, u);
-  gEq = gequilibrium(fields[1], mu[1], u);
+  gEq = gequilibrium(fields(1), mu(1), u);
 
   for (int i=0; i<nvel; ++i) {
-    f(x,y,z,i) = f(x,y,z,i) - 1./tau_r * (f(x,y,z,i) - fEq[i]);
-    g(x,y,z,i) = g(x,y,z,i) - 1./tau_p * (g(x,y,z,i) - gEq[i]);
+    f(x,y,z,i) = f(x,y,z,i) - 1./tau_r * (f(x,y,z,i) - fEq(i));
+    g(x,y,z,i) = g(x,y,z,i) - 1./tau_p * (g(x,y,z,i) - gEq(i));
   }
 
 }
