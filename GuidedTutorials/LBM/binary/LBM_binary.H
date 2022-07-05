@@ -348,15 +348,11 @@ inline void LBM_init_droplet(const Real r,
     const Real rz = z-box[0]/2;
     const Real r2 = rx*rx+ry*ry+rz*rz;
 #endif
+    const Real r = sqrt(r2);
 
-    const Real rho=1.0;
-    Real phi;
-
-    if (r2 < R*R) {
-      phi = 0.5;
-    } else {
-      phi = -0.5;
-    }
+    const Real rho = 1.0;
+    const Real phi0 = 0.5;
+    const Real phi = phi0*tanh((R-r)/sqrt(kappa));
 
     for (int i=0; i<nvel; i++) {
       f[nbx](x,y,z,i) = w[i]*rho;
