@@ -78,6 +78,7 @@ void main_driver(const char* argv) {
   pp.query("kappa", kappa);
   pp.query("R", radius);
   pp.query("temperature", temperature);
+  pp.query("R", radius);
 
   // set up Box and Geomtry
   IntVect dom_lo(0, 0, 0);
