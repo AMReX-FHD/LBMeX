@@ -95,7 +95,7 @@ void hydrovars(int x, int y, int z,
   h(x,y,z,5) = pressure(rho,phi);
 }
 
-#if 0
+#if 0 // equilibrium populations not necessary for MRT
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Array1D<Real,0,nvel> fequilibrium(const Array1D<Real,0,2>& fields,
 			      const Array1D<RealVect,0,2>& gradients,
@@ -199,7 +199,7 @@ Array1D<Real,0,nvel> fequilibrium_moments(const Array1D<Real,0,2>& fields,
   return mEq;
 }
 
-#if 0
+#if 0 // equilibrium populations not necessary for MRT
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Array1D<Real,0,nvel> gequilibrium(const Real& phi,
 			      const Real& mu_phi,
@@ -232,11 +232,13 @@ Array1D<Real,0,nvel> gequilibrium(const Real& phi,
 #endif
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-Array1D<Real,0,nvel> gequilibrium_moments(const Real& phi,
-				   const Real& mu_phi,
+Array1D<Real,0,nvel> gequilibrium_moments(const Array1D<Real,0,2>& fields,
+				   const Array1D<Real,0,2>& mu,
 				   const RealVect& u) {
   Array1D<Real,0,nvel> mEq;
 
+  const Real phi = fields(1);
+  const Real mu_phi = mu(1);
   const Real u2 = u[0]*u[0]+u[1]*u[1]+u[2]*u[2];
 
   mEq( 0) = phi;
@@ -245,7 +247,7 @@ Array1D<Real,0,nvel> gequilibrium_moments(const Real& phi,
   mEq( 2) = phi*u[1];
   mEq( 3) = phi*u[2];
 
-  mEq( 4) = phi*u2 + 3.*Gamma*mu_phi - phi;
+  mEq( 4) = 3.*Gamma*mu_phi + phi*u2 - phi;
   mEq( 5) = phi*(3.*u[0]*u[0]-u2);
   mEq( 6) = phi*(u[1]*u[1]-u[2]*u[2]);
   mEq( 7) = phi*u[0]*u[1];
@@ -259,7 +261,7 @@ Array1D<Real,0,nvel> gequilibrium_moments(const Real& phi,
   mEq(14) = 0.;
   mEq(15) = 0.;
 
-  mEq(16) = 0.;
+  mEq(16) = -3.*Gamma*mu_phi + phi;
   mEq(17) = 0.;
   mEq(18) = 0.;
 
@@ -287,14 +289,21 @@ void collide(int x, int y, int z,
 
   const Array1D<Real,0,2> mu = chemical_potentials(fields, gradients, laplacians);
 
-  Array1D<Real,0,nvel> fEq, gEq;
-  fEq = fequilibrium(fields, gradients, laplacians, u);
-  gEq = gequilibrium(fields(1), mu(1), u);
+  Array1D<Real,0,nvel> mf, mg, mfEq, mgEq;
+
+  mf = moments(x,y,z,f);
+  mg = moments(x,y,z,g);
+
+  mfEq = fequilibrium_moments(fields, gradients, laplacians, u);
+  mgEq = gequilibrium_moments(fields, mu, u);
 
   for (int i=0; i<nvel; ++i) {
-    f(x,y,z,i) = f(x,y,z,i) - 1./tau_r * (f(x,y,z,i) - fEq(i));
-    g(x,y,z,i) = g(x,y,z,i) - 1./tau_p * (g(x,y,z,i) - gEq(i));
+    mf(i) = mf(i) - 1./tau_r * (mf(i) - mfEq(i));
+    mg(i) = mg(i) - 1./tau_p * (mg(i) - mgEq(i));
   }
+
+  populations(x,y,z,f,mf);
+  populations(x,y,z,g,mg);
 
 }
 
