@@ -3,9 +3,7 @@
 
 #include "LBM_d3q19.H"
 
-// 0.5*(1.+1./sqrt(3.))
-AMREX_GPU_MANAGED Real tau_r = 0.7886751345948129; // minimizes spurious currents
-
+AMREX_GPU_MANAGED Real tau_r = 0.7886751345948129; // tau=0.5*(1.+1./sqrt(3.)) minimizes spurious currents according to Swift et al.
 AMREX_GPU_MANAGED Real tau_p = 1.0;
 
 AMREX_GPU_MANAGED Real kappa = 0.01;
@@ -97,6 +95,7 @@ void hydrovars(int x, int y, int z,
   h(x,y,z,5) = pressure(rho,phi);
 }
 
+#if 0
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Array1D<Real,0,nvel> fequilibrium(const Array1D<Real,0,2>& fields,
 			      const Array1D<RealVect,0,2>& gradients,
@@ -147,7 +146,60 @@ Array1D<Real,0,nvel> fequilibrium(const Array1D<Real,0,2>& fields,
 
   return fEq;
 }
+#endif
 
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Array1D<Real,0,nvel> fequilibrium_moments(const Array1D<Real,0,2>& fields,
+			      const Array1D<RealVect,0,2>& gradients,
+			      const Array1D<Real,0,2>& laplacians,
+			      const RealVect& u) {
+  Array1D<Real,0,nvel> mEq;
+
+  const Real rho = fields(0);
+  const Real phi = fields(1);
+  const Real u2 = u[0]*u[0]+u[1]*u[1]+u[2]*u[2];
+  const RealVect Drho = gradients(0);
+  const RealVect Dphi = gradients(1);
+  const Real D2rho = laplacians(0);
+  const Real D2phi = laplacians(1);
+  const Real pbulk = pressure(rho, phi);
+
+  Real G[3][3], traceG=0.; // Eq. (39) in Swift et al.
+  G[0][0] = kappa*Drho[0]*Drho[0] + kappa*Dphi[0]*Dphi[0]; traceG  = G[0][0];
+  G[1][1] = kappa*Drho[1]*Drho[1] + kappa*Dphi[1]*Dphi[1]; traceG += G[1][1];
+  G[2][2] = kappa*Drho[2]*Drho[2] + kappa*Dphi[2]*Dphi[2]; traceG += G[2][2];
+  G[0][1] = kappa*Drho[0]*Drho[1] + kappa*Dphi[0]*Dphi[1];
+  G[1][2] = kappa*Drho[1]*Drho[2] + kappa*Dphi[1]*Dphi[2];
+  G[2][0] = kappa*Drho[2]*Drho[0] + kappa*Dphi[2]*Dphi[0];
+
+  mEq( 0) = rho;
+
+  mEq( 1) = rho*u[0];
+  mEq( 2) = rho*u[1];
+  mEq( 3) = rho*u[2];
+
+  mEq( 4) = 3.*(pbulk-kappa*(rho*D2rho+phi*D2phi)) + rho*u2 - 0.5*traceG - rho;
+  mEq( 5) = rho*(3.*u[0]*u[0]-u2) + (3.*G[0][0]-traceG);
+  mEq( 6) = rho*(u[1]*u[1]-u[2]*u[2]) + (G[1][1]-G[2][2]);
+  mEq( 7) = rho*u[0]*u[1] + G[0][1];
+  mEq( 8) = rho*u[1]*u[2] + G[1][2];
+  mEq( 9) = rho*u[2]*u[0] + G[2][0];
+
+  mEq(10) = 0.;
+  mEq(11) = 0.;
+  mEq(12) = 0.;
+  mEq(13) = 0.;
+  mEq(14) = 0.;
+  mEq(15) = 0.;
+
+  mEq(16) = 1.5*traceG - 3.*(pbulk-kappa*(rho*D2rho+phi*D2phi)) + rho;
+  mEq(17) = 2.*(G[1][1]+G[2][2]-2.*G[0][0]);
+  mEq(18) = 2.*(G[2][2]-G[1][1]);
+
+  return mEq;
+}
+
+#if 0
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Array1D<Real,0,nvel> gequilibrium(const Real& phi,
 			      const Real& mu_phi,
@@ -176,6 +228,42 @@ Array1D<Real,0,nvel> gequilibrium(const Real& phi,
   gEq(0) = phi - sumg;
 
   return gEq;
+}
+#endif
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Array1D<Real,0,nvel> gequilibrium_moments(const Real& phi,
+				   const Real& mu_phi,
+				   const RealVect& u) {
+  Array1D<Real,0,nvel> mEq;
+
+  const Real u2 = u[0]*u[0]+u[1]*u[1]+u[2]*u[2];
+
+  mEq( 0) = phi;
+
+  mEq( 1) = phi*u[0];
+  mEq( 2) = phi*u[1];
+  mEq( 3) = phi*u[2];
+
+  mEq( 4) = phi*u2 + 3.*Gamma*mu_phi - phi;
+  mEq( 5) = phi*(3.*u[0]*u[0]-u2);
+  mEq( 6) = phi*(u[1]*u[1]-u[2]*u[2]);
+  mEq( 7) = phi*u[0]*u[1];
+  mEq( 8) = phi*u[1]*u[2];
+  mEq( 9) = phi*u[2]*u[0];
+
+  mEq(10) = 0.;
+  mEq(11) = 0.;
+  mEq(12) = 0.;
+  mEq(13) = 0.;
+  mEq(14) = 0.;
+  mEq(15) = 0.;
+
+  mEq(16) = 0.;
+  mEq(17) = 0.;
+  mEq(18) = 0.;
+
+  return mEq;
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -224,7 +312,7 @@ void stream_push(int x, int y, int z,
   }
 }
 
-// push scheme
+// collide and stream (push scheme)
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void collide_stream(int x, int y, int z,
 		    const Array4<Real>& fOld,  const Array4<Real>& gOld,
@@ -235,6 +323,7 @@ void collide_stream(int x, int y, int z,
   stream_push(x, y, z, fOld, gOld, fNew, gNew); // push populations to neighbors
 }
 
+// calculate hydrodynamic moments for whole lattice
 inline void LBM_hydrovars(MultiFab& mf, MultiFab& mg, MultiFab& hydrovs) {
   auto const & f = mf.arrays();
   auto const & g = mg.arrays();
@@ -244,6 +333,7 @@ inline void LBM_hydrovars(MultiFab& mf, MultiFab& mg, MultiFab& hydrovs) {
   });
 }
 
+// LB timestep for whole lattice
 inline void LBM_timestep(const Geometry& geom,
 			 MultiFab& fold, MultiFab& gold,
 			 MultiFab& fnew, MultiFab& gnew,
