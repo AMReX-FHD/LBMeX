@@ -324,7 +324,8 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void collide(int x, int y, int z,
 	     const Array4<Real>& f,
 	     const Array4<Real>& g,
-	     const Array4<Real>& h) {
+	     const Array4<Real>& h,
+	     RandomEngine const& engine) {
   Array1D<Real,0,nvel> mf, mg;
 
   mf = moments(x,y,z,f);
@@ -356,8 +357,9 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void collide_stream(int x, int y, int z,
 		    const Array4<Real>& fOld,  const Array4<Real>& gOld,
 		    const Array4<Real>& fNew,  const Array4<Real>& gNew,
-		    const Array4<Real>& h) {
-  collide(x, y, z, fOld, gOld, h); // collide populations on current site
+		    const Array4<Real>& h,
+		    RandomEngine const& rng) {
+  collide(x, y, z, fOld, gOld, h, rng); // collide populations on current site
   stream_push(x, y, z, fOld, gOld, fNew, gNew); // push populations to neighbors
 }
 
@@ -376,20 +378,21 @@ inline void LBM_timestep(const Geometry& geom,
 			 MultiFab& fold, MultiFab& gold,
 			 MultiFab& fnew, MultiFab& gnew,
 			 MultiFab& hydrovs) {
+  const int halo = 1; // need to push from first halo layer into domain
   fold.FillBoundary(geom.periodicity());
   gold.FillBoundary(geom.periodicity());
   hydrovs.FillBoundary(geom.periodicity());
-  auto const & fOld = fold.arrays();
-  auto const & gOld = gold.arrays();
-  auto const & fNew = fnew.arrays();
-  auto const & gNew = gnew.arrays();
-  auto const & h = hydrovs.arrays();
-  IntVect halo = IntVect(1); // need to push from first halo layer into domain
-  ParallelFor(fold, halo, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
-    collide_stream(x, y, z,
-		   fOld[nbx], gOld[nbx],
-		   fNew[nbx], gNew[nbx], h[nbx]);
-  });
+  for (MFIter mfi(fold); mfi.isValid(); ++mfi) {
+    const Array4<Real>& fOld = fold.array(mfi);
+    const Array4<Real>& gOld = gold.array(mfi);
+    const Array4<Real>& fNew = fnew.array(mfi);
+    const Array4<Real>& gNew = gnew.array(mfi);
+    const Array4<Real>& h = hydrovs.array(mfi);
+    const Box& valid_box = mfi.growntilebox(halo);
+    ParallelForRNG(valid_box, [=] AMREX_GPU_DEVICE(int x, int y, int z, RandomEngine const& engine) {
+      collide_stream(x, y, z, fOld, gOld, fNew, gNew, h, engine);
+    });
+  }
   MultiFab::Swap(fold, fnew, 0, 0, nvel, 0);
   MultiFab::Swap(gold, gnew, 0, 0, nvel, 0);
   LBM_hydrovars(fold, gold, hydrovs);
