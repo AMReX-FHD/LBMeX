@@ -73,9 +73,11 @@ void main_driver(const char* argv) {
   pp.query("max_grid_size", max_grid_size);
   pp.query("nsteps", nsteps);
   pp.query("plot_int", plot_int);
+  pp.query("lambda", lambda);
   pp.query("T", T);
   pp.query("kappa", kappa);
   pp.query("R", radius);
+  pp.query("temperature", temperature);
 
   // set up Box and Geomtry
   IntVect dom_lo(0, 0, 0);

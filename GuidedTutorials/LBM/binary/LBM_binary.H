@@ -332,6 +332,7 @@ void collide(int x, int y, int z,
   mg = moments(x,y,z,g);
 
   relax_moments(x,y,z,mf,mg,h);
+  thermalize_moments(mf,mg,engine);
 
   populations(x,y,z,f,mf);
   populations(x,y,z,g,mg);
