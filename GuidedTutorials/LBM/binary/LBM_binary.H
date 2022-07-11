@@ -269,10 +269,11 @@ Array1D<Real,0,nvel> gequilibrium_moments(const Array1D<Real,0,2>& fields,
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void collide(int x, int y, int z,
-	     Array4<Real> f,
-	     Array4<Real> g,
-	     Array4<Real> h) {
+void relax_moments(int x, int y, int z,
+		   Array1D<Real,0,nvel>& mf,
+		   Array1D<Real,0,nvel>& mg,
+		   const Array4<Real>& h) {
+
 
   const Array1D<Real,0,2> fields = { h(x,y,z,0), h(x,y,z,1) };
   const RealVect u = { h(x,y,z,2), h(x,y,z,3), h(x,y,z,4) };
@@ -289,11 +290,7 @@ void collide(int x, int y, int z,
 
   const Array1D<Real,0,2> mu = chemical_potentials(fields, gradients, laplacians);
 
-  Array1D<Real,0,nvel> mf, mg, mfEq, mgEq;
-
-  mf = moments(x,y,z,f);
-  mg = moments(x,y,z,g);
-
+  Array1D<Real,0,nvel> mfEq, mgEq;
   mfEq = fequilibrium_moments(fields, gradients, laplacians, u);
   mgEq = gequilibrium_moments(fields, mu, u);
 
@@ -301,6 +298,20 @@ void collide(int x, int y, int z,
     mf(i) = mf(i) - 1./tau_r * (mf(i) - mfEq(i));
     mg(i) = mg(i) - 1./tau_p * (mg(i) - mgEq(i));
   }
+
+}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void collide(int x, int y, int z,
+	     const Array4<Real>& f,
+	     const Array4<Real>& g,
+	     const Array4<Real>& h) {
+  Array1D<Real,0,nvel> mf, mg;
+
+  mf = moments(x,y,z,f);
+  mg = moments(x,y,z,g);
+
+  relax_moments(x,y,z,mf,mg,h);
 
   populations(x,y,z,f,mf);
   populations(x,y,z,g,mg);
