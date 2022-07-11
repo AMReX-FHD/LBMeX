@@ -13,6 +13,8 @@ AMREX_GPU_MANAGED Real T = 0.5;
 
 AMREX_GPU_MANAGED Real Gamma = 1.0;
 
+AMREX_GPU_MANAGED Real temperature = 0.0;
+
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 RealVect gradient(int x, int y, int z, const Array4<Real>& field, int icomp) {
   RealVect gradient = { 0.0, 0.0, 0.0 };
@@ -302,6 +304,23 @@ void relax_moments(int x, int y, int z,
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void thermalize_moments(Array1D<Real,0,nvel>& mf,
+			Array1D<Real,0,nvel>& mg,
+			RandomEngine const& engine) {
+  const Real rho = mf(0);
+  const Real phi = mg(0);
+  const Real gamma_r = 1. - 1./tau_r;
+  const Real gamma_p = 1. - 1./tau_p;
+  const Real phi_r = sqrt(rho*temperature/cs2*(1.-gamma_r*gamma_r));
+  const Real phi_p = sqrt(phi*temperature/cs2*(1.-gamma_p*gamma_p));
+  Array<Real,nvel> r = {}; // {} to value initialize r
+  for (int i=4; i<nvel; ++i) {
+    mf(i) += sqrt(b[i])*phi_r*RandomNormal(0., 1., engine);
+    mg(i) += sqrt(b[i])*phi_p*RandomNormal(0., 1., engine);
+  }
+}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void collide(int x, int y, int z,
 	     const Array4<Real>& f,
 	     const Array4<Real>& g,
@@ -337,8 +356,7 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void collide_stream(int x, int y, int z,
 		    const Array4<Real>& fOld,  const Array4<Real>& gOld,
 		    const Array4<Real>& fNew,  const Array4<Real>& gNew,
-		    const Array4<Real>& h
-			   ) {
+		    const Array4<Real>& h) {
   collide(x, y, z, fOld, gOld, h); // collide populations on current site
   stream_push(x, y, z, fOld, gOld, fNew, gNew); // push populations to neighbors
 }
