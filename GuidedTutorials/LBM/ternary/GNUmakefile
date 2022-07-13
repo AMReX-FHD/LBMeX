@@ -1,4 +1,5 @@
 AMREX_HOME ?= ../../../../amrex
+FHDEX_HOME ?= ../../../../../AMReX-FHD/FHDeX
 
 DEBUG	= FALSE
 
@@ -15,13 +16,13 @@ include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
 include ./Make.package
 
-include ../../../../../AMReX-FHD/FHDeX/src_common/Make.package
-VPATH_LOCATIONS   += ../../../../../AMReX-FHD/FHDeX/src_common/
-INCLUDE_LOCATIONS += ../../../../../AMReX-FHD/FHDeX/src_common/
+include $(FHDEX_HOME)/src_common/Make.package
+VPATH_LOCATIONS   += $(FHDEX_HOME)/src_common/
+INCLUDE_LOCATIONS += $(FHDEX_HOME)/src_common/
 
-include ../../../../../AMReX-FHD/FHDeX/src_analysis/Make.package
-VPATH_LOCATIONS   += ../../../../../AMReX-FHD/FHDeX/src_analysis/
-INCLUDE_LOCATIONS += ../../../../../AMReX-FHD/FHDeX/src_analysis/
+include $(FHDEX_HOME)/src_analysis/Make.package
+VPATH_LOCATIONS   += $(FHDEX_HOME)/src_analysis/
+INCLUDE_LOCATIONS += $(FHDEX_HOME)/src_analysis/
 
 include $(AMREX_HOME)/Src/Base/Make.package
 
