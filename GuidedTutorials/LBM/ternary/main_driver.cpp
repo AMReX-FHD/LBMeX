@@ -54,6 +54,9 @@ inline Vector<std::string> VariableNames(const int numVars) {
 
 void main_driver(const char* argv) {
 
+  // store the current time so we can later compute total run time.
+  Real strt_time = ParallelDescriptor::second();
+  
   // default grid parameters
   int nx = 16;
   int max_grid_size = 8;
@@ -123,4 +126,10 @@ void main_driver(const char* argv) {
     Print() << "LB step " << step << "\n";
   }
 
+  // Call the timer again and compute the maximum difference between the start time
+  // and stop time over all processors
+  Real stop_time = ParallelDescriptor::second() - strt_time;
+  ParallelDescriptor::ReduceRealMax(stop_time);
+  amrex::Print() << "Run time = " << stop_time << std::endl;
+  
 }
