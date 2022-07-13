@@ -3,27 +3,35 @@
 
 #include "LBM_d3q19.H"
 
+AMREX_GPU_MANAGED
 Real tau_r = 1.0,
      tau_p = 1.0,
      tau_s = 0.666667;
 
+AMREX_GPU_MANAGED
 Real kappa1 = 0.01,
      kappa2 = 0.01,
      kappa3 = 0.01;
 
-Real kappa_rr = (kappa1+kappa2)/4.,
-     kappa_pp = kappa_rr,
-     kappa_ss = (kappa1+kappa2+4.*kappa3)/4.,
-     kappa_rp = (kappa1-kappa2)/4.,
-     kappa_ps = -kappa_rp,
-     kappa_rs = -kappa_rr;
+// define these in fequilibrium since you cannot declare these on a GPU to be dynamic
+/*
+AMREX_GPU_MANAGED Real kappa_rr = (kappa1+kappa2)/4.;
+AMREX_GPU_MANAGED Real kappa_pp = kappa_rr;
+AMREX_GPU_MANAGED Real kappa_ss = (kappa1+kappa2+4.*kappa3)/4.;
+AMREX_GPU_MANAGED Real kappa_rp = (kappa1-kappa2)/4.;
+AMREX_GPU_MANAGED Real kappa_ps = -kappa_rp;
+AMREX_GPU_MANAGED Real kappa_rs = -kappa_rr;
+*/
 
+AMREX_GPU_MANAGED
 Real gamma_p = 1.0,
      gamma_s = 1.0;
 
+AMREX_GPU_MANAGED
 Real alpha = 1.0;
 
-inline RealVect gradient(int x, int y, int z, const Array4<Real>& field, int icomp) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+RealVect gradient(int x, int y, int z, const Array4<Real>& field, int icomp) {
   RealVect gradient = { 0.0, 0.0, 0.0 };
   for (int i=0; i<nvel; i++) {
     int xp = x + c[i][0];
@@ -36,7 +44,8 @@ inline RealVect gradient(int x, int y, int z, const Array4<Real>& field, int ico
   return gradient;
 }
 
-inline Real laplacian(int x, int y, int z, const Array4<Real>& field, int icomp) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Real laplacian(int x, int y, int z, const Array4<Real>& field, int icomp) {
   Real laplacian = 0.0;
   for (int i=0; i<nvel; i++) {
     int xp = x + c[i][0];
@@ -47,37 +56,38 @@ inline Real laplacian(int x, int y, int z, const Array4<Real>& field, int icomp)
   return laplacian;
 }
 
-inline Array<Real,3> chemical_potentials(const Array<Real,3>& fields,
-					 const Array<RealVect,3>& gradients,
-					 const Array<Real,3>& laplacians) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Array1D<Real,0,3> chemical_potentials(const Array1D<Real,0,3>& fields,
+				      const Array1D<RealVect,0,3>& gradients,
+				      const Array1D<Real,0,3>& laplacians) {
   const Real alpha2 = alpha*alpha;
-  const Real rho = fields[0];
-  const Real phi = fields[1];
-  const Real psi = fields[2];
-  const RealVect Drho = gradients[0];
-  const RealVect Dphi = gradients[1];
-  const RealVect Dpsi = gradients[2];
-  const Real D2rho = laplacians[0];
-  const Real D2phi = laplacians[1];
-  const Real D2psi = laplacians[2];
+  const Real rho = fields(0);
+  const Real phi = fields(1);
+  const Real psi = fields(2);
+  const RealVect Drho = gradients(0);
+  const RealVect Dphi = gradients(1);
+  const RealVect Dpsi = gradients(2);
+  const Real D2rho = laplacians(0);
+  const Real D2phi = laplacians(1);
+  const Real D2psi = laplacians(2);
 
-  Array<Real,3> mu = { 0.0, 0.0, 0.0 } ;
+  Array1D<Real,0,3> mu = { 0.0, 0.0, 0.0 } ;
 #if 0
   /* mu_rho is not needed for the calculations.
      The following expression has not been tested.
      (Eq. (38) in Semprebon et al. may contain typos) */
-  mu[0] =
+  mu(0) =
       kappa1/8.*(rho+psi-phi)*(rho+phi-psi-2.)*(rho+phi-psi-1.)
     + kappa2/8.*(rho-phi-psi)*(rho-phi-psi-2.)*(rho-phi-psi-1.)
     - alpha2/4.*((kappa1+kappa2)*(D2rho-D2psi)-(kappa1-kappa2)*D2phi);
 #endif
 
-  mu[1] = // Eq. (39) in Semprebon et al.
+  mu(1) = // Eq. (39) in Semprebon et al.
       kappa1/8.*(rho+phi-psi)*(rho+phi-psi-2.)*(rho+phi-psi-1.)
     - kappa2/8.*(rho-phi-psi)*(rho-phi-psi-2.)*(rho-phi-psi-1.)
     - alpha2/4.*((kappa1-kappa2)*(D2rho-D2psi)+(kappa1+kappa2)*D2phi);
 
-  mu[2] = // Eq. (40) in Semprebon et al.
+  mu(2) = // Eq. (40) in Semprebon et al.
     - kappa1/8.*(rho+phi-psi)*(rho+phi-psi-2.)*(rho+phi-psi-1.)
     - kappa2/8.*(rho-phi-psi)*(rho-phi-psi-2.)*(rho-phi-psi-1.)
     + kappa3*psi*(psi-1.)*(2.*psi-1.)
@@ -87,7 +97,8 @@ inline Array<Real,3> chemical_potentials(const Array<Real,3>& fields,
   return mu;
 }
 
-inline Real pressure(Real rho, Real phi, Real psi) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Real pressure(Real rho, Real phi, Real psi) {
   const Real rho2 = rho*rho;
   const Real rho3 = rho2*rho;
   const Real rho4 = rho3*rho;
@@ -116,11 +127,12 @@ inline Real pressure(Real rho, Real phi, Real psi) {
   return p0;
 }
 
-inline void hydrovars(int x, int y, int z,
-		      const Array4<Real>& f,
-		      const Array4<Real>& g,
-		      const Array4<Real>& k,
-		      const Array4<Real>& h) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void hydrovars(int x, int y, int z,
+	       const Array4<Real>& f,
+	       const Array4<Real>& g,
+	       const Array4<Real>& k,
+	       const Array4<Real>& h) {
   Real rho, phi, psi, j[3];
   rho = phi = psi = j[0] = j[1] = j[2] = 0.0;
   for (int i=0; i<nvel; ++i) {
@@ -144,21 +156,29 @@ inline void hydrovars(int x, int y, int z,
   h(x,y,z,6) = pressure(rho,phi,psi);
 }
 
-inline Array<Real,nvel> fequilibrium(const Array<Real,3>& fields,
-				     const Array<RealVect,3>& gradients,
-				     const Array<Real,3>& laplacians,
-				     const RealVect& u) {
-  Array<Real,nvel> fEq;
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Array1D<Real,0,nvel> fequilibrium(const Array1D<Real,0,3>& fields,
+				  const Array1D<RealVect,0,3>& gradients,
+				  const Array1D<Real,0,3>& laplacians,
+				  const RealVect& u) {
+  Real kappa_rr = (kappa1+kappa2)/4.;
+  Real kappa_pp = kappa_rr;
+  Real kappa_ss = (kappa1+kappa2+4.*kappa3)/4.;
+  Real kappa_rp = (kappa1-kappa2)/4.;
+  Real kappa_ps = -kappa_rp;
+  Real kappa_rs = -kappa_rr;
 
-  const Real rho = fields[0];
-  const Real phi = fields[1];
-  const Real psi = fields[2];
-  const RealVect Drho = gradients[0];
-  const RealVect Dphi = gradients[1];
-  const RealVect Dpsi = gradients[2];
-  const Real D2rho = laplacians[0];
-  const Real D2phi = laplacians[1];
-  const Real D2psi = laplacians[2];
+  Array1D<Real,0,nvel> fEq;
+
+  const Real rho = fields(0);
+  const Real phi = fields(1);
+  const Real psi = fields(2);
+  const RealVect Drho = gradients(0);
+  const RealVect Dphi = gradients(1);
+  const RealVect Dpsi = gradients(2);
+  const Real D2rho = laplacians(0);
+  const Real D2phi = laplacians(1);
+  const Real D2psi = laplacians(2);
   const Real pbulk = pressure(rho, phi, psi);
 
   Real ruu[3][3];
@@ -209,18 +229,19 @@ inline Array<Real,nvel> fequilibrium(const Array<Real,3>& fields,
     fi += 3.*kappa_ps*(wg[i][0][1]*(Dphi[0]*Dpsi[1]+Dphi[1]*Dpsi[0])
 		       +wg[i][1][2]*(Dphi[1]*Dpsi[2]+Dphi[2]*Dpsi[1])
 		       +wg[i][2][0]*(Dphi[2]*Dpsi[0]+Dphi[0]*Dpsi[2]));
-    fEq[i] = fi;
+    fEq(i) = fi;
     sumf += fi;
   }
-  fEq[0] = rho - sumf;
+  fEq(0) = rho - sumf;
 
   return fEq;
 }
 
-inline Array<Real,nvel> gequilibrium(const Real& phi,
-				     const Real& mu_phi,
-				     const RealVect& u) {
-  Array<Real,nvel> gEq;
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Array1D<Real,0,nvel> gequilibrium(const Real& phi,
+				  const Real& mu_phi,
+				  const RealVect& u) {
+  Array1D<Real,0,nvel> gEq;
 
   Real puu[3][3];
   puu[0][0] = phi*u[0]*u[0];
@@ -238,18 +259,19 @@ inline Array<Real,nvel> gequilibrium(const Real& phi,
 			 +(puu[1][1]*c[i][1]+2.*puu[1][2]*c[i][2])*c[i][1]
 			 +(puu[2][2]*c[i][2]+2.*puu[2][0]*c[i][0])*c[i][2]);
     gi -= 3./2.*w[i]*(puu[0][0]+puu[1][1]+puu[2][2]);
-    gEq[i] = gi;
+    gEq(i) = gi;
     sumg += gi;
   }
-  gEq[0] = phi - sumg;
+  gEq(0) = phi - sumg;
 
   return gEq;
 }
 
-inline Array<Real,nvel> kequilibrium(const Real& psi,
-				     const Real& mu_psi,
-				     const RealVect& u) {
-  Array<Real,nvel> kEq;
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Array1D<Real,0,nvel> kequilibrium(const Real& psi,
+				  const Real& mu_psi,
+				  const RealVect& u) {
+  Array1D<Real,0,nvel> kEq;
 
   double puu[3][3];
   puu[0][0] = psi*u[0]*u[0];
@@ -267,58 +289,60 @@ inline Array<Real,nvel> kequilibrium(const Real& psi,
 			 +(puu[1][1]*c[i][1]+2.*puu[1][2]*c[i][2])*c[i][1]
 			 +(puu[2][2]*c[i][2]+2.*puu[2][0]*c[i][0])*c[i][2]);
     ki -= 3./2.*w[i]*(puu[0][0]+puu[1][1]+puu[2][2]);
-    kEq[i] = ki;
+    kEq(i) = ki;
     sumk += ki;
   }
-  kEq[0] = psi - sumk;
+  kEq(0) = psi - sumk;
 
   return kEq;
 }
 
-inline void collide(int x, int y, int z,
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void collide(int x, int y, int z,
 		    Array4<Real> f,
 		    Array4<Real> g,
 		    Array4<Real> k,
 		    Array4<Real> h) {
 
-  const Array<Real,3> fields = { h(x,y,z,0), h(x,y,z,1), h(x,y,z,2) };
+  const Array1D<Real,0,3> fields = { h(x,y,z,0), h(x,y,z,1), h(x,y,z,2) };
   const RealVect u = { h(x,y,z,3), h(x,y,z,4), h(x,y,z,5) };
 
-  const Array<RealVect,3> gradients = {
+  const Array1D<RealVect,0,3> gradients = {
     gradient(x,y,z,h,0),
     gradient(x,y,z,h,1),
     gradient(x,y,z,h,2)
   };
 
-  const Array<Real,3> laplacians = {
+  const Array1D<Real,0,3> laplacians = {
     laplacian(x,y,z,h,0),
     laplacian(x,y,z,h,1),
     laplacian(x,y,z,h,2)
   };
 
-  const Array<Real,3> mu = chemical_potentials(fields, gradients, laplacians);
+  const Array1D<Real,0,3> mu = chemical_potentials(fields, gradients, laplacians);
 
-  Array<Real,nvel> fEq, gEq, kEq;
+  Array1D<Real,0,nvel> fEq, gEq, kEq;
   fEq = fequilibrium(fields, gradients, laplacians, u);
-  gEq = gequilibrium(fields[1], mu[1], u);
-  kEq = kequilibrium(fields[2], mu[2], u);
+  gEq = gequilibrium(fields(1), mu(1), u);
+  kEq = kequilibrium(fields(2), mu(2), u);
 
   for (int i=0; i<nvel; ++i) {
-    f(x,y,z,i) = f(x,y,z,i) - 1./tau_r * (f(x,y,z,i) - fEq[i]);
-    g(x,y,z,i) = g(x,y,z,i) - 1./tau_p * (g(x,y,z,i) - gEq[i]);
-    k(x,y,z,i) = k(x,y,z,i) - 1./tau_s * (k(x,y,z,i) - kEq[i]);
+    f(x,y,z,i) = f(x,y,z,i) - 1./tau_r * (f(x,y,z,i) - fEq(i));
+    g(x,y,z,i) = g(x,y,z,i) - 1./tau_p * (g(x,y,z,i) - gEq(i));
+    k(x,y,z,i) = k(x,y,z,i) - 1./tau_s * (k(x,y,z,i) - kEq(i));
   }
 
 }
 
 // stream from \vec{x} to \vec{x}+\vec{c}_i (push scheme)
-inline void stream_push(int x, int y, int z,
-			const Array4<Real>& fOld,
-			const Array4<Real>& gOld,
-			const Array4<Real>& kOld,
-			const Array4<Real>& fNew,
-			const Array4<Real>& gNew,
-			const Array4<Real>& kNew) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void stream_push(int x, int y, int z,
+		 const Array4<Real>& fOld,
+		 const Array4<Real>& gOld,
+		 const Array4<Real>& kOld,
+		 const Array4<Real>& fNew,
+		 const Array4<Real>& gNew,
+		 const Array4<Real>& kNew) {
   for (int i=0; i<nvel; ++i) { // push populations to neighbors
     int xp = x + c[i][0];
     int yp = y + c[i][1];
@@ -330,14 +354,15 @@ inline void stream_push(int x, int y, int z,
 }
 
 // push scheme
-inline void collide_stream(int x, int y, int z,
-			   const Array4<Real>& fOld,
-			   const Array4<Real>& gOld,
-			   const Array4<Real>& kOld,
-			   const Array4<Real>& fNew,
-			   const Array4<Real>& gNew,
-			   const Array4<Real>& kNew,
-			   const Array4<Real>& h
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void collide_stream(int x, int y, int z,
+		    const Array4<Real>& fOld,
+		    const Array4<Real>& gOld,
+		    const Array4<Real>& kOld,
+		    const Array4<Real>& fNew,
+		    const Array4<Real>& gNew,
+		    const Array4<Real>& kNew,
+		    const Array4<Real>& h
 			   ) {
   collide(x, y, z, fOld, gOld, kOld, h); // collide populations on current site
   stream_push(x, y, z, fOld, gOld, kOld, fNew, gNew, kNew); // push populations to neighbors
@@ -421,7 +446,6 @@ inline void LBM_init_double_emulsion(const Real r,
   auto const & f = mf.arrays();
   auto const & g = mg.arrays();
   auto const & k = mk.arrays();
-  GpuArray<Real,3> dx = geom.CellSizeArray();
   ParallelFor(mf, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
     Real rx = x-box[0]/2;
     Real ry = y-box[1]/2;
@@ -469,7 +493,6 @@ inline void LBM_init_liquid_lens(const Real r,
   auto const & f = mf.arrays();
   auto const & g = mg.arrays();
   auto const & k = mk.arrays();
-  GpuArray<Real,3> dx = geom.CellSizeArray();
   ParallelFor(mf, IntVect(0), [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
     Real rx = x-box[0]/2;
     Real ry = y-box[1]/2;
