@@ -161,11 +161,11 @@ void main_driver(const char* argv) {
     const Real uy = A*std::sin(2.*M_PI*x/nx);
     const RealVect u = {0., uy, 0. };
     for (int i=0; i<ncomp; ++i) {
-      m[nbx](x,y,z,i) = mequilibrium(density, u)[i];
-      f[nbx](x,y,z,i) = fequilibrium(density, u)[i];
+      m[nbx](x,y,z,i) = mequilibrium(density, u)(i);
+      f[nbx](x,y,z,i) = fequilibrium(density, u)(i);
     }
     for (int i=0; i<10; ++i) {
-      h[nbx](x,y,z,i) = hydrovars(mequilibrium(density, u))[i];
+      h[nbx](x,y,z,i) = hydrovars(mequilibrium(density, u))(i);
       hEq[nbx](x,y,z,i) = h[nbx](x,y,z,i);
     }
   });
