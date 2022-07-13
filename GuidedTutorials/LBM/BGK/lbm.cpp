@@ -58,7 +58,7 @@ void lbm_main() {
   ParallelFor(fold, ngs, [=] AMREX_GPU_DEVICE(int nbx, int x, int y, int z) {
     Real uy = A*std::sin(2.*M_PI*x/nx);
     for (int i=0; i<ncomp; ++i) {
-      f[nbx](x,y,z,i)= fequilibrium(1.0, {0., uy, 0.})[i];
+      f[nbx](x,y,z,i)= fequilibrium(1.0, {0., uy, 0.})(i);
     }
   });
   
