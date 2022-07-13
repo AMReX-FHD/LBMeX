@@ -1,7 +1,6 @@
 AMREX_HOME ?= ../../../../amrex
 
 DEBUG	= FALSE
-DEBUG	= TRUE
 
 DIM	= 3
 
