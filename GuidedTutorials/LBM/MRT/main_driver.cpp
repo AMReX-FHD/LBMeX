@@ -38,6 +38,10 @@ void UpdateTimeData(MultiFab& mfData, const MultiFab& mfVal, const int comp, con
 }
 
 void main_driver(const char* argv) {
+
+  // store the current time so we can later compute total run time.
+  Real strt_time = ParallelDescriptor::second();
+  
   const int nHydroVars = 1 + AMREX_SPACEDIM + AMREX_SPACEDIM*(AMREX_SPACEDIM+1)/2;
 
   // default grid parameters
@@ -236,4 +240,10 @@ void main_driver(const char* argv) {
 
   Print() << "Green-Kubo viscosity for tau = " << tau << " eta = " << eta << std::endl;
 
+  // Call the timer again and compute the maximum difference between the start time
+  // and stop time over all processors
+  Real stop_time = ParallelDescriptor::second() - strt_time;
+  ParallelDescriptor::ReduceRealMax(stop_time);
+  amrex::Print() << "Run time = " << stop_time << std::endl;
+  
 }

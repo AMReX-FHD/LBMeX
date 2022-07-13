@@ -9,6 +9,9 @@
 
 void lbm_main() {
 
+  // store the current time so we can later compute total run time.
+  Real strt_time = ParallelDescriptor::second();
+  
   // default grid parameters
   int nx = 16;
   int nsteps = 100;
@@ -108,6 +111,12 @@ void lbm_main() {
 
   }
 
+  // Call the timer again and compute the maximum difference between the start time
+  // and stop time over all processors
+  Real stop_time = ParallelDescriptor::second() - strt_time;
+  ParallelDescriptor::ReduceRealMax(stop_time);
+  amrex::Print() << "Run time = " << stop_time << std::endl;
+  
 }
 
 int main(int argc, char* argv[])
