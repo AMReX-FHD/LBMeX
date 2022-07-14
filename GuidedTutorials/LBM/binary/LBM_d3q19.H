@@ -238,7 +238,7 @@ Array1D<Real,0,nvel> populations(const Array1D<Real,0,nvel>& mom) {
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 Array1D<Real,0,nvel> populations(int x, int y, int z, const Array4<Real>& fsite, const Array1D<Real,0,nvel>& m) {
   Array1D<Real,0,nvel> f = populations(m);
-  for (int i; i<nvel; ++i) {
+  for (int i=0; i<nvel; ++i) {
     fsite(x,y,z,i) = f(i);
   }
   return f;
