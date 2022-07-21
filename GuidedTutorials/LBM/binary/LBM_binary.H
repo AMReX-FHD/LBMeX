@@ -374,6 +374,55 @@ inline void LBM_hydrovars(MultiFab& mf, MultiFab& mg, MultiFab& hydrovs) {
   });
 }
 
+// LB thermalization procedure for spatially correlated, non-diagonal noise
+inline void LBM_thermalization(MultiFab& noise, MultiFab& hydrovs,
+			       const Array1D<Real,0,nvel> mf,
+			       const Array1D<Real,0,nvel> mg) {
+  const int halo = 1; // need to push from first halo layer into domain
+  const int ncons = 1 + AMREX_SPACEDIM;
+  const int nnoise = nvel - ncons;
+  const Real gamma_r = 1. - 1./tau_r;
+  const Real gamma_p = 1. - 1./tau_p;
+  const Real rho = mf(0);
+  const Real phi = mg(0);
+
+  for (MFIter mfi(noise); mfi.isValid(); ++mfi) {
+    const Box& valid_box = mfi.growntilebox(halo);
+    const Array4<Real>& xi = noise.array(mfi);
+
+    /* construct noise in k-space */
+    ParallelForRNG(valid_box, [=] AMREX_GPU_DEVICE(int kx, int ky, int kz, RandomEngine const& engine) {
+
+      /* construct noise covariance matrix */
+      Array2D<Real,0,0,2*nnoise,2*nnoise> C = {}, L = {};
+      Array1D<Real,0,2*nnoise> r = {};
+      for (int i=0, j=nnoise; i<nnoise; ++i, ++j) {
+	C(i,i) = b[i+ncons]*rho*temperature/cs2*(1.-gamma_r*gamma_r);
+	C(j,j) = b[i+ncons]*phi*temperature/cs2*(1.-gamma_p*gamma_p);
+	r(i) = RandomNormal(0., 1., engine);
+	r(j) = RandomNormal(0., 1., engine);
+      }
+
+      /* Cholesky decomposition of noise covariance matrix */
+      //L = cholesky_decomp(C);
+
+      /* compute correlated noise vector from Gaussian random variables */
+      for (int i=0, k=nnoise; i<nnoise; ++i, ++k) {
+	xi(kx,ky,kz,i+ncons) = 0.0;
+	xi(kx,ky,kz,k+2*ncons) = 0.0;
+	for (int j=0, l=nnoise; j<nnoise; ++j, ++l) {
+	  xi(kx,ky,kz,i+ncons) += L(i,j)*r(i);
+	  xi(kx,ky,kz,k+2*ncons) += L(k,l)*r(l);
+	}
+      }
+    });
+  }
+
+  /* inverse Fourier transform noise vector to real space */
+  //xi = ifft(xi)
+
+}
+
 // LB timestep for whole lattice
 inline void LBM_timestep(const Geometry& geom,
 			 MultiFab& fold, MultiFab& gold,
