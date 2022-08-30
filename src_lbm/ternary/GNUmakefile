@@ -1,5 +1,5 @@
-AMREX_HOME ?= ../../../../amrex
-FHDEX_HOME ?= ../../../../../AMReX-FHD/FHDeX
+AMREX_HOME ?= ../../../amrex
+FHDEX_HOME ?= ../../../FHDeX
 
 DEBUG	= FALSE
 
