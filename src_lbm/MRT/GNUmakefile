@@ -35,5 +35,5 @@ endif
 ifeq ($(USE_CUDA),TRUE)
   LIBRARIES += -lcufft
 else
-  LIBRARIES += -L$(FFTW_DIR) -lfftw3_mpi -lfftw3
+  LIBRARIES += $(shell pkgconf --libs fftw3) -lfftw3_mpi
 endif
