@@ -1,6 +1,8 @@
 AMREX_HOME ?= ../../../amrex
 FHDEX_HOME ?= ../../../FHDeX
 
+DEFINES += -DMAX_SPECIES=1
+
 DEBUG	= FALSE
 
 DIM	= 3
@@ -35,5 +37,5 @@ endif
 ifeq ($(USE_CUDA),TRUE)
   LIBRARIES += -lcufft
 else
-  LIBRARIES += $(shell pkgconf --libs fftw3) -lfftw3_mpi
+  LIBRARIES += $(shell pkg-config --libs fftw3)
 endif
